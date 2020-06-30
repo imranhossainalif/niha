@@ -1,0 +1,296 @@
+/* ==============================
+GENERAL 
+ ================================*/
+a {
+  color: #b2cc02;
+  text-decoration: none;
+}
+a:hover,
+a:focus {
+  color: #b2cc02;
+  text-decoration: underline;
+}
+.btn-primary{
+	color: #fff;
+	background-color: #b2cc02;
+	border-color: #b2cc02;
+}
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary.focus,
+.btn-primary:active,
+.btn-primary.active,
+.open > .dropdown-toggle.btn-primary {
+  color: #fff;
+  background-color: #97AD03;
+  border-color: #97AD03;
+}
+
+.title .sublead {
+	color: #b2cc02;
+}
+
+
+
+
+/* ==============================
+BANNER 
+ ================================*/
+.banner p {
+	background-color: rgba(109, 211, 13, .7);
+  
+}
+.slides-pagination a.current {
+	background: #b2cc02;
+}
+.banner a{
+	text-decoration:none;
+}
+.banner h1:hover {
+	color:#b2cc02;
+}
+
+/* ==============================
+NAVBAR
+ ================================*/
+.navbar-default .navbar-nav > .active > a, .navbar-default .navbar-nav > .active > a:hover, .navbar-default .navbar-nav > .active > a:focus {
+	color: #b2cc02;
+	background-color:transparent;
+	border-bottom:6px solid #b2cc02;
+}
+.main-menu .navbar-nav > li > a:hover {
+	color:#b2cc02;
+}
+.dropdown-menu > li > a:hover,
+.dropdown-menu > li > a:focus {
+	color: #fff;
+	text-decoration: none;
+	background-color: #b2cc02;
+}
+.dropdown-menu > .active > a,
+.dropdown-menu > .active > a:hover,
+.dropdown-menu > .active > a:focus {
+	color: #fff;
+	text-decoration: none;
+	background-color: #b2cc02;
+	outline: 0;
+}
+.navbar-default .navbar-nav > .open > a, .navbar-default .navbar-nav > .open > a:hover, .navbar-default .navbar-nav > .open > a:focus {
+	color: #b2cc02;
+	background-color: transparent;
+}
+.nav .open > a, .nav .open > a:hover, .nav .open > a:focus {
+	background-color: #fff;
+	border-color: #b2cc02;
+}
+
+
+
+/* ==============================
+ABOUT
+ ================================*/
+.about-item:hover{
+	background:#F8FFCB;
+	border:1px solid #ccc;
+}
+.about-item:hover .fa{
+	color:#b2cc02;
+}
+.about-item a {
+	color: #b2cc02;
+}
+
+/* ==============================
+SERVICES
+ ================================*/
+.service-item .icon {
+	background-color: #b2cc02;
+}
+
+/* ==============================
+WORK
+ ================================*/
+.r-item .separator_wrapper::after, .r-item .separator_wrapper::before {
+	background-color: #b2cc02;
+}
+.r-item a:hover .project-icon .fa:hover{
+	color:#b2cc02;
+}
+
+/* ==============================
+STATS
+ ================================*/
+.stat-item .icon {
+	background-color: #b2cc02;
+}
+.stat-item h1 {
+	color: #b2cc02;
+}
+
+/* ==============================
+TEAM
+ ================================*/
+.team-item a:hover .fa {
+	color:#b2cc02;
+}
+.team-item .item-body h3 {
+  color: #b2cc02;
+}
+.team-item:hover .item-body {
+	background:#F8FFCB;
+}
+
+/* ==============================
+BLOG
+ ================================*/
+.blog-item .gambar .date {
+	background: #b2cc02;
+}
+.blog-item:hover .item-body {
+	background:#F8FFCB;
+} 
+button.btn.btn-default:hover {
+	color: #fff;
+	background-color: #97AD03;
+	border-color: #97AD03;
+}
+.single-header .breadcrumb > li a {
+  color: #b2cc02;
+}
+.pagination > li > a,
+.pagination > li > span {
+	color: #b2cc02;
+	margin-left: 6px;
+}
+.pagination > .active > a,
+.pagination > .active > span,
+.pagination > .active > a:hover,
+.pagination > .active > span:hover,
+.pagination > .active > a:focus,
+.pagination > .active > span:focus {
+	background-color: #b2cc02;
+	border-color: #b2cc02;
+}
+.pagination > li > a:hover,
+.pagination > li > span:hover,
+.pagination > li > a:focus,
+.pagination > li > span:focus {
+	color: #b2cc02;
+	background-color: #eee;
+	border-color: #ddd;
+}
+.widget a:hover{
+	color: #b2cc02;
+}
+.widget button.btn.btn-default {
+	background: #b2cc02;
+}
+.widget h4, h4.text-uppercase {
+	background: #b2cc02;
+}
+.comment h4 {
+	color: #b2cc02;
+	background: transparent;
+	padding: 15px 0px;
+	margin: 0 0px 20px 0px;
+}
+.nav-tabs > li.active > a, .nav-tabs > li.active > a:hover, .nav-tabs > li.active > a:focus {
+	background-color: #b2cc02;
+}
+ul.list-inline.bullet-lists li:hover { 
+	background: #b2cc02;
+}
+
+
+/* ==============================
+ELEMENT
+ ================================*/
+.element {
+	background-color: #b2cc02;
+}
+.element-content .btn-primary {
+   color: #b2cc02;
+}
+.btn-primary:hover,
+.btn-primary:focus,
+.btn-primary.focus,
+.btn-primary:active,
+.btn-primary.active,
+.open > .dropdown-toggle.btn-primary {
+  color: #fff;
+}
+
+/* ==============================
+PRICING
+ ================================*/
+.panel-pricing .price {
+	color: #b2cc02;
+}
+.panel-pricing .btn-primary:hover {
+	background-color: #b2cc02;
+	border-color: #b2cc02;
+}
+.panel-pricing:hover > .panel-heading,
+.panel-pricing:hover > .panel-body,
+.panel-pricing:hover > .panel-footer {
+	background-color: #F8FFCB;
+}
+/* ==============================
+TESTIMONIALS
+ ================================*/
+.testimony .item-testimony  .people .name {
+	color:#b2cc02;
+}
+
+/* ==============================
+NEWS
+ ================================*/
+.blog-item .item-body a.readmore {
+  color: #b2cc02;
+}
+
+
+/* ==============================
+MAPS
+ ================================*/
+#cd-zoom-in,
+#cd-zoom-out {
+  background-color: rgba(178, 204, 2, .9);
+}
+
+.no-touch #cd-zoom-in:hover,
+.no-touch #cd-zoom-out:hover {
+  background-color: #b2cc02;
+}
+
+
+/* ==============================
+FOOTER
+ ================================*/
+.footer .sosmed .fa:hover{
+	background-color:#b2cc02;
+}
+.copyright {
+   background-color: #b2cc02;
+}
+
+/* ==============================
+BACK TO TOP
+ ================================*/
+.cd-top {
+	background-color: rgba(178, 204, 2, .8);
+}
+.no-touch .cd-top:hover {
+	background-color: #b2cc02;
+}
+
+/* ==============================
+404
+ ================================*/
+.p404 {
+	background-color: #b2cc02;
+}
+.entry-intro a{
+	color: #fff
+}
+

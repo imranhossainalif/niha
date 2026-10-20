@@ -1,0 +1,95 @@
+// Phase 1: one generic document table (Doc) so the legacy code ports losslessly.
+// Phase 3 will add typed models for the hot collections (tasks, sales_daily, ...).
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x", "debian-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  owner
+  admin
+  staff
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  passwordHash String   @map("password_hash")
+  role         Role     @default(staff)
+  /// business ids this user may see (staff only; owner/admin see everything)
+  businesses   String[] @default([])
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+  apiKeys      ApiKey[]
+
+  @@map("users")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  name       String
+  /// first chars of the key, shown in Settings so the owner can tell keys apart
+  prefix     String
+  /// sha256 of the full key; the key itself is shown once and never stored
+  hash       String    @unique
+  scopes     String[]  @default(["read"])
+  userId     String    @map("user_id")
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now()) @map("created_at")
+  lastUsedAt DateTime? @map("last_used_at")
+  revokedAt  DateTime? @map("revoked_at")
+
+  @@map("api_keys")
+}
+
+/// Every write bumps `seq` from the global doc_seq sequence; clients poll /api/sync?since=<seq>.
+model Doc {
+  collection String
+  id         String
+  data       Json
+  version    Int      @default(1)
+  /// business this doc belongs to (derived on write), used for staff access checks
+  business   String?
+  seq        BigInt   @default(dbgenerated("nextval('doc_seq'::regclass)"))
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @default(now()) @map("updated_at")
+
+  @@id([collection, id])
+  @@index([seq])
+  @@index([collection, business])
+  @@map("docs")
+}
+
+model DocTombstone {
+  seq        BigInt   @id @default(dbgenerated("nextval('doc_seq'::regclass)"))
+  collection String
+  id         String
+  business   String?
+  deletedAt  DateTime @default(now()) @map("deleted_at")
+
+  @@map("doc_tombstones")
+}
+
+/// Background jobs requested from the UI/API and run by the worker (e.g. Messenger history import).
+model Job {
+  id         String    @id @default(cuid())
+  kind       String
+  params     Json      @default("{}")
+  status     String    @default("queued") // queued | running | done | failed
+  result     Json?
+  error      String?
+  createdBy  String?   @map("created_by")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  startedAt  DateTime? @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+
+  @@index([status, createdAt])
+  @@map("jobs")
+}

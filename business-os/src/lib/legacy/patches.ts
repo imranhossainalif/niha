@@ -1,0 +1,53 @@
+// Small, explicit edits applied to legacy/business-os.html when it is served at /app.
+// The spec file itself stays untouched. Each `find` must occur exactly once, or the page refuses to load
+// (so a change to the legacy file can't silently drop a patch). Remove a patch once its tab is ported natively.
+export type Patch = { name: string; find: string; replace: string };
+
+export const PATCHES: Patch[] = [
+  {
+    name: 'Serve d3 from this server (no CDN dependency)',
+    find: '<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>',
+    replace: '<script src="/legacy/vendor/d3-7.9.0.min.js"></script>',
+  },
+  {
+    name: 'InboxPilot: website → knowledge fetches the page on the server (replaces the Make scenario)',
+    find: "const webB = el('button', { class: 'btn sm' }, '+ Website theke'); webB.addEventListener('click', () => openForm('ib_kb', null, { business: 'kidscare', kind: 'web', use: 'true', text: '' }));",
+    replace: "const webB = el('button', { class: 'btn sm' }, '+ Website theke'); webB.addEventListener('click', async () => { const u = prompt('Website er link (lekha ber kore dekhabo, apni check kore save korben)'); if (!u) return; toast('Page porchi…'); try { const r = await window.__bos.fetchUrl(u); openForm('ib_kb', null, { business: 'kidscare', kind: 'web', use: 'true', link: r.url, title: 'Website: ' + (r.title || r.url).slice(0, 120), text: r.text }); } catch (e) { toast('Page pora jayni: ' + (e.message || e.code)); openForm('ib_kb', null, { business: 'kidscare', kind: 'web', use: 'true', link: u, text: '' }); } });",
+  },
+  {
+    name: 'InboxPilot: show the live 24-hour reply window',
+    find: "el('span', { class: 'note' }, 'Messenger e customer er shesh message er 24 ghontar moddhe reply dite hoy.')",
+    replace: "el('span', { class: 'note' }, window.__bos.windowNote(c.ms))",
+  },
+  {
+    name: 'InboxPilot Channels: native webhook status + old-message import',
+    find: "row('Make scenario (team reply)', set.send_scenario, 'ID ' + (set.send_scenario || '—'))));",
+    replace: "row('Make scenario (team reply)', set.send_scenario, 'ID ' + (set.send_scenario || '—')),\n    row('Native webhook (ei server)', true, 'Meta app er callback URL: ' + location.origin + '/api/meta/webhook — eta set korle Make ar lagbe na.'),\n    window.__bos.importBox()));",
+  },
+  {
+    name: 'InboxPilot Billing: AI now runs on our own Anthropic key',
+    find: "el('div', {}, el('b', {}, 'AI: '), 'Make er built-in Claude Haiku 5.5 — Make credit theke kate, alada API key lage na.'),",
+    replace: "el('div', {}, el('b', {}, 'AI: '), 'Nijer Anthropic API key (server .env e ANTHROPIC_API_KEY, model ANTHROPIC_MODEL) — Anthropic console e khoroch dekhun.'),",
+  },
+  {
+    name: 'InboxPilot Team: access is now per user in Admin → Users',
+    find: "'Inbox dekhte protita member er nijer claude.ai te Make connector lagbe, ba apni nijer device theke uttor dite paren.'",
+    replace: "'Inbox dekhte member ke Admin → Users e login din ar Kids Care business assign korun.'",
+  },
+];
+
+export function applyPatches(html: string, patches = PATCHES): string {
+  let out = html;
+  for (const p of patches) {
+    const n = out.split(p.find).length - 1;
+    if (n !== 1) throw new Error(`Legacy patch "${p.name}" matched ${n} times (expected 1)`);
+    out = out.replace(p.find, () => p.replace);
+  }
+  return out;
+}
+
+/** Full HTML document: the legacy file is an artifact body, so add the document shell and the compatibility shim. */
+export function legacyDocument(legacyHtml: string): string {
+  return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<script src="/legacy/bos-shim.js"></script>\n'
+    + applyPatches(legacyHtml) + '\n</html>\n';
+}

@@ -1,0 +1,51 @@
+# Production: docker compose up -d --build   (needs .env next to this file; see README)
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-bos}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-business_os}
+    volumes: [pgdata:/var/lib/postgresql/data]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-bos}"]
+      interval: 5s
+      retries: 20
+
+  web:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-business_os}
+    depends_on: { postgres: { condition: service_healthy } }
+    volumes: [./data:/app/data:ro]
+
+  worker:
+    build: .
+    restart: unless-stopped
+    command: ["npx", "tsx", "worker/index.ts"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-bos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-business_os}
+      BACKUP_DIR: /app/backups
+    depends_on: { web: { condition: service_started } }
+    volumes: [./backups:/app/backups]
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [web]
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:

@@ -1,0 +1,17 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root { --bg: #f2f5f4; --panel: #fff; --fg: #14211e; --muted: #5c6e69; --line: #d7e0dd; --accent: #13896f; }
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #0d1412; --panel: #151f1c; --fg: #e3ece9; --muted: #93a6a0; --line: #28372f; --accent: #34c08e; color-scheme: dark; }
+}
+body { background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+.muted { color: var(--muted); }
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 14px; background: var(--panel); cursor: pointer; }
+.btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--panel); color: var(--fg); width: 100%; }
+table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
+table.t th, table.t td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+a.link { color: var(--accent); text-decoration: underline; }

@@ -1,6 +1,8 @@
 // Small, explicit edits applied to legacy/business-os.html when it is served at /app.
 // The spec file itself stays untouched. Each `find` must occur exactly once, or the page refuses to load
 // (so a change to the legacy file can't silently drop a patch). Remove a patch once its tab is ported natively.
+import { SALES_LIVE_JS } from './salesLive';
+
 export type Patch = { name: string; find: string; replace: string };
 
 export const PATCHES: Patch[] = [
@@ -34,6 +36,16 @@ export const PATCHES: Patch[] = [
     find: "'Inbox dekhte protita member er nijer claude.ai te Make connector lagbe, ba apni nijer device theke uttor dite paren.'",
     replace: "'Inbox dekhte member ke Admin → Users e login din ar Kids Care business assign korun.'",
   },
+  {
+    name: 'Sales Team: live "aaj" card and clickable date-wise call list at the top',
+    find: 'function bizSalesTeam(id) {',
+    replace: SALES_LIVE_JS + 'function bizSalesTeam(id) {',
+  },
+  {
+    name: 'Sales Team: show the live cards first',
+    find: '  return [kcSprint(true), tiles, mergeNote, dayCard',
+    replace: '  return [...stLiveCards(REPS, L), kcSprint(true), tiles, mergeNote, dayCard',
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {
@@ -49,5 +61,7 @@ export function applyPatches(html: string, patches = PATCHES): string {
 /** Full HTML document: the legacy file is an artifact body, so add the document shell and the compatibility shim. */
 export function legacyDocument(legacyHtml: string): string {
   return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<script src="/legacy/bos-shim.js"></script>\n'
+    // phone width: let cards and selects shrink instead of pushing the page sideways
+    + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select{max-width:100%}</style>\n'
     + applyPatches(legacyHtml) + '\n</html>\n';
 }

@@ -4,10 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import zlib from 'node:zlib';
 import { pipeline } from 'node:stream/promises';
+import { envVal } from '../config';
 
 export async function backup() {
   const dir = process.env.BACKUP_DIR || path.join(process.cwd(), 'backups');
-  const keep = Number(process.env.BACKUP_KEEP) || 14;
+  const keep = Number(envVal("BACKUP_KEEP")) || 14;
   fs.mkdirSync(dir, { recursive: true });
   const file = path.join(dir, 'business_os-' + new Date().toISOString().slice(0, 10) + '.sql.gz');
   const url = new URL(process.env.DATABASE_URL!);

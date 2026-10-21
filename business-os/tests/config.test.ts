@@ -17,3 +17,17 @@ describe('settings encryption', () => {
     expect(decrypt(c.slice(0, -4) + 'AAAA')).toBeNull();
   });
 });
+
+import { envVal } from '@/lib/config';
+describe('env values with Docker inline comments', () => {
+  it('treats "# note" as unset and strips trailing comments', () => {
+    process.env.T_A = '# AI Assistant, InboxPilot replies';
+    process.env.T_B = 'claude-haiku-5-5      # chat + inbox';
+    process.env.T_C = 'abc#def';
+    process.env.T_D = '';
+    expect(envVal('T_A')).toBeUndefined();
+    expect(envVal('T_B')).toBe('claude-haiku-5-5');
+    expect(envVal('T_C')).toBe('abc#def');
+    expect(envVal('T_D')).toBeUndefined();
+  });
+});

@@ -43,6 +43,17 @@ export function decrypt(stored: string): string | null {
   } catch { return null; }
 }
 
+/**
+ * Env value with any trailing "# comment" removed. Docker's env_file keeps inline comments as part of the value
+ * (`KEY=   # note` arrives as "# note"), which must count as unset.
+ */
+export function envVal(key: string): string | undefined {
+  const raw = process.env[key];
+  if (raw == null) return undefined;
+  const v = raw.replace(/(^|\s+)#.*$/, '').trim();
+  return v === '' ? undefined : v;
+}
+
 let cache: { at: number; vals: Record<string, string> } | null = null;
 async function saved(): Promise<Record<string, string>> {
   if (cache && Date.now() - cache.at < 30000) return cache.vals;
@@ -56,8 +67,8 @@ export const clearConfigCache = () => { cache = null; };
 
 /** Value for a key: env var, else Admin setting, else undefined. */
 export async function cfg(key: ConfigKey): Promise<string | undefined> {
-  const env = process.env[key];
-  if (env != null && env !== '') return env;
+  const env = envVal(key);
+  if (env) return env;
   const v = (await saved())[key];
   return v != null && v !== '' ? v : undefined;
 }
@@ -67,8 +78,8 @@ export const isOn = (v?: string) => /^(1|on|true|yes)$/i.test(v || '');
 export async function configStatus() {
   const s = await saved();
   return CONFIG_FIELDS.map((f) => {
-    const fromEnv = !!process.env[f.key];
-    const val = fromEnv ? process.env[f.key]! : s[f.key];
+    const fromEnv = !!envVal(f.key);
+    const val = fromEnv ? envVal(f.key)! : s[f.key];
     return { ...f, source: fromEnv ? 'env' : s[f.key] ? 'admin' : null, display: !val ? '' : f.secret ? '••••' + val.slice(-4) : val };
   });
 }

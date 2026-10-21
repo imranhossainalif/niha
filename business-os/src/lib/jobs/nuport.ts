@@ -10,7 +10,15 @@ import { salesDaily, slim, type NuportOrder } from '../calc/nuport';
 const API = 'https://api.nuport.io/integration/orders/SO-';
 const TERMINAL = new Set(['COMPLETED', 'CANCELLED']);
 const ordersCol = () => db().collection('nuport_orders');
-const storedOrders = async () => (await ordersCol().limit(50000).orderBy('so', 'desc').get()).map((s) => s.data as Stored);
+// all stored orders, newest first (queries return at most 5000 rows, so page through)
+async function storedOrders(): Promise<Stored[]> {
+  const out: Stored[] = [];
+  for (let off = 0; ; off += 5000) {
+    const page = await ordersCol().orderBy('so', 'desc').limit(5000).offset(off).get();
+    out.push(...page.map((s) => s.data as Stored));
+    if (page.length < 5000) return out;
+  }
+}
 const save = (so: number, o: NuportOrder) => ordersCol().doc(String(so)).set({ ...o, so });
 
 /**
@@ -146,4 +154,12 @@ export async function nuportBackfill(opts: { fromDate: string; key?: string; tod
   const days = await writeSalesDaily(all, opts.fromDate, today);
   await saveState({ done: true, added, failed, days: days.length });
   return { refetched: old.length, added, low: st.low, days: days.length, first_day: days[0] ?? null, still_failed: failed.length };
+}
+
+/** Recompute sales_daily from the stored orders for fromDate..today (no fetching). */
+export async function nuportRecompute(opts: { fromDate: string; today?: string }) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.fromDate)) throw new Error('fromDate must be YYYY-MM-DD');
+  const all = await storedOrders();
+  const days = await writeSalesDaily(all, opts.fromDate, opts.today ?? bdToday());
+  return { orders: all.length, days: days.length, first_day: days[0] ?? null };
 }

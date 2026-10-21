@@ -55,11 +55,11 @@ function push() {
 
 /* ---------------- Google Analytics 4 → Business OS (website traffic) ----------------
  * Setup (once):
- *  1. Left menu "Services" (+) → "Google Analytics Data API" → Add.
- *  2. Put the GA4 property id below (GA4 → Admin → Property details → Property ID, only numbers).
+ *  1. Left menu "Services" (+) → add "Google Analytics Data API" AND "Google Analytics Admin API".
+ *  2. Put the GA4 id below: the Measurement ID (G-…) or the numeric Property ID both work.
  *  3. Choose function "setupGA4" → Run → allow. It sends the last ~14 months once, then every hour the last 3 days.
  */
-const GA4_PROPERTY = 'PASTE_GA4_PROPERTY_ID';
+const GA4_PROPERTY = 'G-NEP6NGZB28';
 const GA4_URL = 'https://os.osmanhadi.live/api/integrations/ga4';
 
 function setupGA4() {
@@ -68,20 +68,45 @@ function setupGA4() {
   pushGA4(420);
 }
 
+/** Numeric property id: as given, or found from a Measurement ID (G-…) through the Analytics Admin API (cached). */
+function ga4PropertyId_() {
+  if (/^\d+$/.test(GA4_PROPERTY)) return GA4_PROPERTY;
+  var props = PropertiesService.getScriptProperties();
+  var cached = props.getProperty('GA4_ID_' + GA4_PROPERTY);
+  if (cached) return cached;
+  if (!/^G-/.test(GA4_PROPERTY)) throw new Error('GA4_PROPERTY must be the Measurement ID (G-…) or the numeric Property ID');
+  var accounts = AnalyticsAdmin.AccountSummaries.list({ pageSize: 200 }).accountSummaries || [];
+  for (var a = 0; a < accounts.length; a++) {
+    var ps = accounts[a].propertySummaries || [];
+    for (var p = 0; p < ps.length; p++) {
+      var streams = AnalyticsAdmin.Properties.DataStreams.list(ps[p].property).dataStreams || [];
+      for (var k = 0; k < streams.length; k++) {
+        if (streams[k].webStreamData && streams[k].webStreamData.measurementId === GA4_PROPERTY) {
+          var id = ps[p].property.split('/')[1];
+          Logger.log('GA4 property for ' + GA4_PROPERTY + ': ' + id + ' (' + ps[p].displayName + ')');
+          props.setProperty('GA4_ID_' + GA4_PROPERTY, id);
+          return id;
+        }
+      }
+    }
+  }
+  throw new Error('No GA4 property with ' + GA4_PROPERTY + ' is visible to this Google account. Give it Viewer access in GA4 → Admin → Property access management.');
+}
+
 function pushGA4(days) {
-  if (!/^\d+$/.test(GA4_PROPERTY)) throw new Error('Put the GA4 property id (numbers) in GA4_PROPERTY first');
+  var propertyId = ga4PropertyId_();
   days = typeof days === 'number' ? days : 3; // a time trigger passes an event object
   var report = AnalyticsData.Properties.runReport({
     dateRanges: [{ startDate: days + 'daysAgo', endDate: 'today' }],
     dimensions: [{ name: 'date' }, { name: 'sessionSource' }, { name: 'sessionMedium' }],
     metrics: [{ name: 'sessions' }, { name: 'totalUsers' }, { name: 'newUsers' }, { name: 'ecommercePurchases' }, { name: 'purchaseRevenue' }],
     limit: 100000,
-  }, 'properties/' + GA4_PROPERTY);
+  }, 'properties/' + propertyId);
   var rows = (report.rows || []).map(function (r) {
     var d = r.dimensionValues, m = r.metricValues;
     return { date: d[0].value, source: d[1].value, medium: d[2].value, sessions: +m[0].value, users: +m[1].value, newUsers: +m[2].value, purchases: +m[3].value, revenue: +m[4].value };
   });
-  var r = UrlFetchApp.fetch(GA4_URL, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ property: GA4_PROPERTY, rows: rows }), headers: { Authorization: 'Bearer ' + BOS_API_KEY }, muteHttpExceptions: true });
+  var r = UrlFetchApp.fetch(GA4_URL, { method: 'post', contentType: 'application/json', payload: JSON.stringify({ property: propertyId, rows: rows }), headers: { Authorization: 'Bearer ' + BOS_API_KEY }, muteHttpExceptions: true });
   Logger.log(r.getResponseCode() + ' ' + r.getContentText().slice(0, 300));
   if (r.getResponseCode() !== 200) throw new Error('Business OS answered ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 300));
 }

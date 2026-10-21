@@ -55,7 +55,12 @@ export const PATCHES: Patch[] = [
   {
     name: 'Kids Care Sales: order source card (call / WhatsApp / Messenger / website / ads) by day, month or year',
     find: 'function bizSales(id) {',
-    replace: ORDER_SOURCE_JS + "function bizSales(id) { const __o = bizSalesBase(id); return id === 'kidscare' ? [orderSourceCard(id), ...__o] : __o; }\nfunction bizSalesBase(id) {",
+    replace: ORDER_SOURCE_JS + "function bizSales(id) { const __o = bizSalesBase(id); return id === 'kidscare' ? [...orderSourceCard(id), ...__o] : __o; }\nfunction bizSalesBase(id) {",
+  },
+  {
+    name: 'Sync web_traffic (GA4) into the page too',
+    find: "'ib_kb', 'ib_broadcasts'];",
+    replace: "'ib_kb', 'ib_broadcasts', 'web_traffic'];",
   },
 ];
 

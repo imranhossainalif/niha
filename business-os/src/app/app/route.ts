@@ -1,6 +1,6 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { sessionPrincipal } from '@/lib/session';
+import { requestPrincipal } from '@/lib/session';
 import { legacyDocument } from '@/lib/legacy/patches';
 
 export const dynamic = 'force-dynamic';
@@ -10,7 +10,7 @@ let cached: { mtime: number; html: string } | null = null;
 
 /** The full legacy dashboard (every tab), running against this server through /legacy/bos-shim.js. */
 export async function GET(req: Request) {
-  const p = await sessionPrincipal();
+  const p = await requestPrincipal(req);
   if (!p) return Response.redirect(new URL('/login?next=/app', req.url), 302);
   const file = path.join(process.cwd(), 'legacy', 'business-os.html');
   const st = await fs.stat(file);

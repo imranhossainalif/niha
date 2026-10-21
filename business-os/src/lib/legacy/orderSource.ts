@@ -29,7 +29,8 @@ function orderSourceCard(id) {
   const todayBtn = el('button', { class: 'btn sm' }, 'Aaj'); todayBtn.addEventListener('click', () => { osMode = 'day'; osDay = today; render(); });
   const top = (k) => (agg[k] ? agg[k].orders : 0);
   const web = ['web_ads', 'web_organic', 'web_direct', 'web_other'].reduce((s, k) => s + top(k), 0);
-  return card('Order kotha theke ashche · ' + label, 'Nuport er order (order toirir din onujayi) · call, WhatsApp, Messenger, website ar ads alada · din e 3 bar auto update',
+  const __web = webTrafficCard(id, from, to, label, ['web_ads', 'web_organic', 'web_direct', 'web_other'].reduce((s, k) => s + (agg[k] ? agg[k].orders : 0), 0));
+  return [card('Order kotha theke ashche · ' + label, 'Nuport er order (order toirir din onujayi) · call, WhatsApp, Messenger, website ar ads alada · din e 3 bar auto update',
     el('div', { class: 'ctrls' }, modeSel, pick, todayBtn),
     el('div', { class: 'tiles' },
       tile('var(--t1)', 'Mot order', String(tot.orders), 'Cancel ' + tot.cancelled + ' · courier e ' + tot.sent),
@@ -44,6 +45,24 @@ function orderSourceCard(id) {
       : emptyBox('Ei shomoy e kono order nai', osMode === 'day' && new Date(osDay + 'T00:00:00').getDay() === 5 ? 'Shukrobar — chuti.' : 'Nuport e ei shomoyer order sync hoyni ba order hoyni.'),
     Object.keys(nowT).length ? el('p', { class: 'note' }, '🚚 Ekhon courier e (shob tarikh): ' + OS_CH.filter(([k]) => nowT[k]).map(([k, l]) => l + ' ' + nowT[k][0] + ' ta (' + tk(nowT[k][1]) + ')').join(' · ')) : null,
     noSrcDays ? el('p', { class: 'note' }, noSrcDays + ' din er order er source Nuport theke ekhono ana hoyni (' + noSrcOrders + ' ta "Source jana nai" e). Purono data ana hole thik hobe.') : null,
-    el('p', { class: 'note' }, 'FACT: Nuport er "source" field. Sales team = UP_SELL. Website ads = website order jar link e paid/FB campaign tag chilo. Messenger e ad theke asha order Messenger e-i gona hoy.'));
+    el('p', { class: 'note' }, 'FACT: Nuport er "source" field. Sales team = UP_SELL. Website ads = website order jar link e paid/FB campaign tag chilo. Messenger e ad theke asha order Messenger e-i gona hoy.')), __web];
+}
+/* website traffic for the same period (web_traffic, from GA4 via the Apps Script) */
+function webTrafficCard(id, from, to, label, webOrders) {
+  const T = (S.web_traffic || []).filter((r) => (r.business || 'kidscare') === id && r.date >= from && r.date <= to);
+  if (!T.length) return card('Website traffic · ' + label, 'Google Analytics (GA4) theke', emptyBox('Ei shomoyer traffic data nai', (S.web_traffic || []).length ? 'Ei din/mash e GA4 data nai.' : 'GA4 connect hole ekhane visitor, source ar conversion dekhabe (Apps Script → setupGA4).'));
+  const tot = { sessions: 0, users: 0, new_users: 0, purchases: 0, revenue: 0 }; const src = {};
+  T.forEach((r) => { for (const k in tot) tot[k] += Number((r.total || {})[k]) || 0; Object.entries(r.by_source || {}).forEach(([k, v]) => { const x = src[k] = src[k] || { k, sessions: 0, users: 0, purchases: 0 }; x.sessions += v.sessions || 0; x.users += v.users || 0; x.purchases += v.purchases || 0; }); });
+  const list = Object.values(src).sort((a, b) => b.sessions - a.sessions).slice(0, 12);
+  const pct = (a, b) => (b ? (Math.round((a / b) * 1000) / 10) + '%' : '—');
+  const last = T.map((r) => r.asof).filter(Boolean).sort().pop();
+  return card('Website traffic · ' + label, 'Google Analytics (GA4) · ' + (last ? 'update ' + ago(last) : '') + ' · ghontay ghontay auto',
+    el('div', { class: 'tiles' },
+      tile('var(--t1)', 'Visit (session)', nf.format(tot.sessions), nf.format(tot.users) + ' visitor (approx)'),
+      tile('var(--t2)', 'Notun visitor', nf.format(tot.new_users), pct(tot.new_users, tot.users) + ' notun'),
+      tile('var(--t4)', 'Website order (Nuport)', String(webOrders), 'GA4 purchase ' + tot.purchases),
+      tile('var(--t5)', 'Conversion', pct(webOrders, tot.sessions), 'Website order ÷ visit')),
+    table([{ l: 'Source / medium', f: (x) => el('b', {}, x.k) }, { l: 'Visit', r: 1, f: (x) => nf.format(x.sessions) }, { l: 'Share', r: 1, f: (x) => pct(x.sessions, tot.sessions) }, { l: 'Visitor', r: 1, f: (x) => nf.format(x.users) }, { l: 'GA4 purchase', r: 1, f: (x) => x.purchases || '—' }], list),
+    el('p', { class: 'note' }, 'FACT: GA4. "fb / paid" ba "facebook / cpc" = ad theke, "google / organic" = Google search, "(direct) / (none)" = link type kore ba bookmark. Visitor sonkha source-wise jog korle ektu beshi hoy (ekjon duibar ashle).'));
 }
 `;

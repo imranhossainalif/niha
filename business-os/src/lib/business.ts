@@ -17,7 +17,7 @@ export const LEGACY_COLS = ['accounts', 'transactions', 'loans', 'dues', 'upcomi
 // Collections whose docs all belong to one business even without a `business` field.
 const FIXED_BUSINESS: Record<string, string> = {
   pl_kidscare: 'kidscare', kc_packing: 'kidscare', calls_daily: 'kidscare', sales_team: 'kidscare',
-  spend_import: 'kidscare', snapshots: 'kidscare', inbox_messages: 'kidscare', nuport_orders: 'kidscare',
+  spend_import: 'kidscare', snapshots: 'kidscare', inbox_messages: 'kidscare', nuport_orders: 'kidscare', web_traffic: 'kidscare',
 };
 // The legacy code treats a missing business as Kids Care in these collections.
 const DEFAULT_KIDSCARE = new Set(['fixed_costs', 'daily_spend', 'pc_items']);

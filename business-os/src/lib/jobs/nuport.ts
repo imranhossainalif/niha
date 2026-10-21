@@ -91,40 +91,59 @@ export async function nuportSync(opts: { key?: string; startSo?: number; today?:
 }
 
 /**
- * One-off history load: re-fetch stored orders saved before sources were kept, then walk back from the oldest
- * stored SO number to the first order created before `fromDate`, save everything in between, and recompute
- * sales_daily from there. Used for the month/year order-source views.
+ * History load for the month/year views. Resumable: progress lives in sync_state/nuport_backfill, so a stopped
+ * job (restart, deploy) carries on where it was. Steps:
+ *  1. re-fetch stored orders saved before sources were kept
+ *  2. find `low`: an SO number created before fromDate (walk back from the oldest stored order)
+ *  3. scan every SO from the newest stored one down to `low`, fetching the ones not stored yet (cursor saved per chunk)
+ *  4. only when the scan is complete: recompute sales_daily from fromDate (never from partial data)
  */
 export async function nuportBackfill(opts: { fromDate: string; key?: string; today?: string }) {
   const key = opts.key ?? (await cfg('NUPORT_API_KEY'));
   if (!key) throw new Error('NUPORT_API_KEY is not set (Admin → Integrations)');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(opts.fromDate)) throw new Error('fromDate must be YYYY-MM-DD');
   const today = opts.today ?? bdToday();
+  const stRef = db().collection('sync_state').doc('nuport_backfill');
+  let st = (await stRef.get())?.data ?? {};
+  if (st.from_date !== opts.fromDate || st.done) st = { from_date: opts.fromDate };
+  const saveState = (patch: Record<string, unknown>) => { st = { ...st, ...patch, updated: new Date().toISOString() }; return stRef.set(st); };
   let all = await storedOrders();
+  if (!all.length) throw new Error('No stored orders yet: run the normal Nuport sync first');
+
   // 1. orders stored without source info
   const old = all.filter((o) => o.source === undefined);
   await pool(old, 4, async (o) => { const n = await fetchOrder(o.so, key).catch(() => null); if (n) await save(o.so, n); });
-  // 2. walk back in steps to find where fromDate starts
-  const minSo = all.length ? Math.min(...all.map((o) => o.so)) : Number(await cfg('NUPORT_START_SO'));
-  if (!minSo) throw new Error('No stored orders yet: run the normal Nuport sync first');
-  const near = async (n: number) => { for (let k = 0; k < 6; k++) { const o = await fetchOrder(n + k, key); if (o) return o; } return null; };
-  let low = minSo;
-  for (let n = minSo - 200; n > 0; n -= 200) {
-    const o = await near(n);
-    low = n;
-    if (!o || (bdDate(o.created) ?? '9999') < opts.fromDate) break;
+
+  // 2. lowest SO to scan to
+  if (!st.low) {
+    const minSo = Math.min(...all.map((o) => o.so));
+    const near = async (n: number) => { for (let k = 0; k < 6; k++) { const o = await fetchOrder(n + k, key).catch(() => null); if (o) return o; } return null; };
+    let low = minSo;
+    const oldest = all.find((o) => o.so === minSo);
+    if (!oldest || (bdDate(oldest.created) ?? '') >= opts.fromDate) {
+      for (let n = minSo - 200; n > 0; n -= 200) { const o = await near(n); low = n; if (!o || (bdDate(o.created) ?? '9999') < opts.fromDate) break; }
+    }
+    await saveState({ low, next: Math.max(...all.map((o) => o.so)) - 1, added: 0, failed: [] });
   }
-  // 3. everything between low and the oldest stored order, newest first: if the job is stopped part-way,
-  //    what is stored stays contiguous and the next run carries on from the new oldest order
-  let added = 0;
-  const nums = Array.from({ length: Math.max(0, minSo - low) }, (_, i) => minSo - 1 - i);
-  for (let i = 0; i < nums.length; i += 40) {
-    const chunk = nums.slice(i, i + 40);
-    const got = await pool(chunk, 4, (x) => fetchOrder(x, key).catch(() => null));
+
+  // 3. scan down, skipping what is stored
+  const have = new Set(all.map((o) => o.so));
+  let added = Number(st.added) || 0; const failed: number[] = [...((st.failed as number[]) || [])];
+  for (let n = Number(st.next); n >= Number(st.low);) {
+    const chunk: number[] = [];
+    while (chunk.length < 40 && n >= Number(st.low)) { if (!have.has(n)) chunk.push(n); n--; }
+    const got = await pool(chunk, 4, async (x) => { try { return await fetchOrder(x, key); } catch { failed.push(x); return null; } });
     for (let j = 0; j < chunk.length; j++) if (got[j]) { await save(chunk[j], got[j]!); added++; }
+    await saveState({ next: n, added, failed: failed.slice(-500) });
   }
+  // one more try for numbers that errored (not 404) on the way
+  const retry = failed.splice(0);
+  const again = await pool(retry, 2, (x) => fetchOrder(x, key).catch(() => null));
+  for (let j = 0; j < retry.length; j++) if (again[j]) { await save(retry[j], again[j]!); added++; } else failed.push(retry[j]);
+
   // 4. recompute every day from fromDate
   all = await storedOrders();
   const days = await writeSalesDaily(all, opts.fromDate, today);
-  return { refetched: old.length, added, from_so: low, days: days.length, first_day: days[0] ?? null };
+  await saveState({ done: true, added, failed, days: days.length });
+  return { refetched: old.length, added, low: st.low, days: days.length, first_day: days[0] ?? null, still_failed: failed.length };
 }

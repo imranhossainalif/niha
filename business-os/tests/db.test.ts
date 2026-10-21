@@ -68,7 +68,7 @@ describe.skipIf(!HAS_DB)('nuport job (mocked API)', () => {
   };
   beforeAll(async () => {
     prisma = (await import('@/lib/prisma')).prisma;
-    await prisma.$executeRaw`DELETE FROM docs WHERE collection IN ('nuport_orders') OR (collection = 'sync_state' AND id = 'nuport')`;
+    await prisma.$executeRaw`DELETE FROM docs WHERE collection IN ('nuport_orders') OR (collection = 'sync_state' AND id IN ('nuport','nuport_backfill'))`;
     vi.stubGlobal('fetch', vi.fn(async (url: string) => {
       const n = Number(String(url).split('SO-')[1]);
       return orders[n] ? new Response(JSON.stringify(orders[n]), { status: 200 }) : new Response('', { status: 404 });
@@ -107,7 +107,7 @@ describe.skipIf(!HAS_DB)('nuport job (mocked API)', () => {
     for (const so of [1001, 1002, 1003]) { const d = (await dbx().collection('nuport_orders').doc(String(so)).get())!.data; const { source, custom_source, web_origin, utm_medium, source_type, campaign_id, web_meta, author, ...rest } = d as Record<string, unknown>; await dbx().collection('nuport_orders').doc(String(so)).set(rest); }
     const { nuportBackfill } = await import('@/lib/jobs/nuport');
     const r = await nuportBackfill({ key: 'k', fromDate: '2026-09-01', today: '2026-10-20' });
-    expect(r).toMatchObject({ refetched: 3, added: 2 });
+    expect(r).toMatchObject({ refetched: 3, added: 2, still_failed: 0 });
     const { db } = await import('@/lib/db');
     const d15 = await db().collection('sales_daily').doc('kidscare_2026-10-15').get();
     expect(d15!.data.orders).toBe(3);

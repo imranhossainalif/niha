@@ -130,13 +130,14 @@ export async function runAgent(opts: {
   maxRounds?: number;
   onText?: (delta: string) => void;
 }): Promise<{ text: string; messages: Anthropic.MessageParam[]; stop: string | null }> {
-  const client = anthropic();
+  const client = await anthropic();
+  const model = opts.complex ? await MODEL_COMPLEX() : await MODEL();
   const messages = [...opts.messages];
   const byName = new Map(opts.tools.map((t) => [t.def.name, t]));
   let text = '', stop: string | null = null;
   for (let round = 0; round < (opts.maxRounds ?? 12); round++) {
     const stream = client.messages.stream({
-      model: opts.complex ? MODEL_COMPLEX() : MODEL(),
+      model,
       max_tokens: 32000,
       system: [{ type: 'text', text: opts.system, cache_control: { type: 'ephemeral' } }],
       messages,

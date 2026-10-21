@@ -1,11 +1,12 @@
 // Google service-account access token (JWT bearer flow) without extra dependencies.
 import { createSign } from 'node:crypto';
+import { cfg } from './config';
 
 let cached: { token: string; exp: number } | null = null;
 
 export async function googleToken(scope = 'https://www.googleapis.com/auth/drive.readonly'): Promise<string> {
   if (cached && cached.exp > Date.now() + 60000) return cached.token;
-  const raw = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
+  const raw = await cfg('GOOGLE_SERVICE_ACCOUNT_JSON');
   if (!raw) throw new Error('GOOGLE_SERVICE_ACCOUNT_JSON is not set');
   const sa = JSON.parse(raw.trim().startsWith('{') ? raw : Buffer.from(raw, 'base64').toString('utf8'));
   const now = Math.floor(Date.now() / 1000);

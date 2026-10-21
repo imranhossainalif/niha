@@ -1,18 +1,20 @@
 // Minimal Meta Graph API client (Messenger send, profile, conversation history).
+import { cfg } from '../config';
+
 const GRAPH = 'https://graph.facebook.com/v21.0';
 
 export class GraphError extends Error {
   constructor(message: string, public status: number, public code?: number) { super(message); }
 }
 
-function token() {
-  const t = process.env.META_PAGE_TOKEN;
-  if (!t) throw new GraphError('META_PAGE_TOKEN is not set', 500);
+async function token() {
+  const t = await cfg('META_PAGE_TOKEN');
+  if (!t) throw new GraphError('META_PAGE_TOKEN is not set (Admin → Integrations)', 500);
   return t;
 }
 
 async function call(path: string, init: RequestInit = {}): Promise<any> {
-  const url = path.startsWith('http') ? path : GRAPH + path + (path.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(token());
+  const url = path.startsWith('http') ? path : GRAPH + path + (path.includes('?') ? '&' : '?') + 'access_token=' + encodeURIComponent(await token());
   const r = await fetch(url, { ...init, headers: { 'content-type': 'application/json', ...(init.headers || {}) } });
   const body = await r.json().catch(() => ({}));
   if (!r.ok || body.error) throw new GraphError(body.error?.message || 'Graph API ' + r.status, r.status, body.error?.code);

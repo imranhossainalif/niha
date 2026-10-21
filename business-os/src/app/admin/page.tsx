@@ -8,6 +8,7 @@ import { sessionPrincipal } from '@/lib/session';
 import { createApiKey } from '@/lib/apikeys';
 import { BIZ, BIZ_IDS } from '@/lib/business';
 import { getConfig, saveConfig } from '@/lib/inbox/store';
+import { configStatus, saveConfig as saveIntegrations, CONFIG_FIELDS } from '@/lib/config';
 import type { Role } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
@@ -18,17 +19,6 @@ async function requireAdmin(ownerOnly = false) {
   if (ownerOnly ? p.role !== 'owner' : p.role === 'staff') redirect('/');
   return p;
 }
-
-const ENV_CHECKS: [string, string][] = [
-  ['ANTHROPIC_API_KEY', 'AI Assistant, InboxPilot reply, chobi → lekha'],
-  ['META_PAGE_TOKEN', 'Messenger reply pathano, purono message import'],
-  ['META_APP_SECRET', 'Webhook signature check'],
-  ['META_VERIFY_TOKEN', 'Webhook verify'],
-  ['META_PAGE_ID', 'Kids Care page'],
-  ['NUPORT_API_KEY', 'Nuport order sync (worker)'],
-  ['GOOGLE_SERVICE_ACCOUNT_JSON', 'Sales team Google Sheets sync (worker)'],
-  ['SUPERMETRICS_API_KEY', 'FB ads / page data'],
-];
 
 export default async function Admin({ searchParams }: { searchParams: Promise<{ msg?: string }> }) {
   const me = await requireAdmin();
@@ -41,6 +31,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     prisma.job.findMany({ orderBy: { createdAt: 'desc' }, take: 15 }),
     getConfig(),
   ]);
+  const integrations = await configStatus();
 
   async function saveUser(fd: FormData) {
     'use server';
@@ -76,6 +67,20 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     await requireAdmin(true);
     await prisma.apiKey.update({ where: { id: String(fd.get('id')) }, data: { revokedAt: new Date() } });
     revalidatePath('/admin');
+  }
+
+  async function saveKeys(fd: FormData) {
+    'use server';
+    const p = await requireAdmin(true);
+    const vals: Record<string, string> = {};
+    for (const f of CONFIG_FIELDS) {
+      const v = String(fd.get(f.key) ?? '').trim();
+      if (v === '-') vals[f.key] = '';
+      else if (v) vals[f.key] = f.key === 'GOOGLE_SERVICE_ACCOUNT_JSON' || !f.secret ? v : v.replace(/\s+/g, '');
+    }
+    await saveIntegrations(vals, p.kind === 'user' ? p.email : 'admin');
+    revalidatePath('/admin');
+    redirect('/admin?msg=saved');
   }
 
   async function toggleAi() {
@@ -147,17 +152,33 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         <form action={toggleAi} className="flex flex-wrap items-center gap-3 text-sm">
           <span>AI auto-reply: <b>{inbox.ai_on ? 'ON' : 'OFF'}</b></span>
           <button className="btn" type="submit">{inbox.ai_on ? 'Bondho korun' : 'Chalu korun'}</button>
-          <span className="muted">Webhook URL: <code>/api/meta/webhook</code></span>
+          <span className="muted">Webhook URL: <code>{(process.env.PUBLIC_URL || '') + '/api/meta/webhook'}</code></span>
         </form>
       </section>
 
-      <section className="card grid gap-2">
+      <section className="card grid gap-3">
         <h2 className="font-semibold">Integrations</h2>
-        <table className="t">
-          <tbody>
-            {ENV_CHECKS.map(([k, what]) => (<tr key={k}><td><code>{k}</code></td><td>{process.env[k] ? '✓ set' : '— nai'}</td><td className="muted">{what}</td></tr>))}
-          </tbody>
-        </table>
+        <p className="muted text-sm">Key ekhane save korle server e encrypted thake, 30 second er moddhe chalu hoy, restart lage na. Faka rakhle ager value thake; muchte chaile <code>-</code> likhun. Server .env e thaka value shob shomoy agradhikar pay.</p>
+        {me.role === 'owner' ? (
+          <form action={saveKeys} className="grid gap-4">
+            {[...new Set(integrations.map((f) => f.group))].map((g) => (
+              <fieldset key={g} className="grid gap-2 sm:grid-cols-2">
+                <legend className="mb-1 font-semibold">{g}</legend>
+                {integrations.filter((f) => f.group === g).map((f) => (
+                  <label key={f.key} className="grid gap-1 text-sm">
+                    <span>{f.label} <span className="muted text-xs">{f.source === 'env' ? '· .env theke' : f.source === 'admin' ? '· saved ' + f.display : '· nai'}</span></span>
+                    {f.key === 'GOOGLE_SERVICE_ACCOUNT_JSON'
+                      ? <textarea className="input" name={f.key} rows={2} placeholder={f.source ? '(saved; notun dile bodlabe)' : f.help} disabled={f.source === 'env'} />
+                      : <input className="input" name={f.key} type={f.secret ? 'password' : 'text'} autoComplete="off" placeholder={f.source && f.secret ? '(saved; notun dile bodlabe)' : f.source ? String(f.display) : f.help} disabled={f.source === 'env'} />}
+                  </label>
+                ))}
+              </fieldset>
+            ))}
+            <div><button className="btn btn-primary" type="submit">Save integrations</button></div>
+          </form>
+        ) : (
+          <table className="t"><tbody>{integrations.map((f) => (<tr key={f.key}><td>{f.label}</td><td>{f.source ? '✓' : '— nai'}</td></tr>))}</tbody></table>
+        )}
       </section>
 
       <section className="card grid gap-2">

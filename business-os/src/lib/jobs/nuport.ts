@@ -3,6 +3,7 @@
 //  2. refresh: orders created in the last 14 days, and unfinished ones up to 45 days old (status changes)
 //  3. recompute sales_daily for the affected BD dates from all stored orders
 import { db } from '../db';
+import { cfg } from '../config';
 import { addDays, bdDate, bdToday } from '../time';
 import { salesDaily, slim, type NuportOrder } from '../calc/nuport';
 
@@ -29,13 +30,13 @@ async function pool<T, R>(items: T[], n: number, f: (x: T) => Promise<R>): Promi
 }
 
 export async function nuportSync(opts: { key?: string; startSo?: number; today?: string } = {}) {
-  const key = opts.key ?? process.env.NUPORT_API_KEY;
-  if (!key) throw new Error('NUPORT_API_KEY is not set');
+  const key = opts.key ?? (await cfg('NUPORT_API_KEY'));
+  if (!key) throw new Error('NUPORT_API_KEY is not set (Admin → Integrations)');
   const store = db();
   const stateRef = store.collection('sync_state').doc('nuport');
   const state = (await stateRef.get())?.data ?? {};
-  const start = Number(state.last_so ?? opts.startSo ?? process.env.NUPORT_START_SO);
-  if (!Number.isFinite(start) || start <= 0) throw new Error('Set NUPORT_START_SO (the last SO number already counted) for the first run');
+  const start = Number(state.last_so ?? opts.startSo ?? (await cfg('NUPORT_START_SO')));
+  if (!Number.isFinite(start) || start <= 0) throw new Error('Set NUPORT_START_SO (the last SO number already counted) in Admin → Integrations for the first run');
   const today = opts.today ?? bdToday();
   const ordersCol = store.collection('nuport_orders');
   const save = (so: number, o: NuportOrder) => ordersCol.doc(String(so)).set({ ...o, so });

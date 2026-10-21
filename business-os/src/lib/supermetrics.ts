@@ -1,5 +1,7 @@
 // Supermetrics Query API (replaces the claude.ai Supermetrics connector the legacy page used).
 // Returns rows in the shape the legacy smRows() expects: data[0] = header row, then values.
+import { cfg } from './config';
+
 const URL_BASE = 'https://api.supermetrics.com/enterprise/v2/query/data/json';
 
 export type SmInput = {
@@ -14,7 +16,7 @@ export type SmInput = {
 };
 
 export async function smQuery(input: SmInput) {
-  const key = process.env.SUPERMETRICS_API_KEY;
+  const key = await cfg('SUPERMETRICS_API_KEY');
   if (!key) throw Object.assign(new Error('SUPERMETRICS_API_KEY is not set'), { code: 'server_not_connected', status: 503 });
   const fields = Array.isArray(input.fields) ? input.fields : String(input.fields).split(',').map((s) => s.trim()).filter(Boolean);
   const q: Record<string, unknown> = {

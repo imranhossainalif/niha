@@ -46,6 +46,15 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
 - **Worker:** `worker/index.ts` (cron, Asia/Dhaka) + `src/lib/jobs/runner.ts` (registry + `jobs` table queue, claimed with
   `FOR UPDATE SKIP LOCKED`). Jobs: `nuport_sync`, `sheets_sync` (downloads sheets, runs `scripts/kc_sync.py` unchanged),
   `inbox_import`, `backup` (pg_dump), and AI jobs gated by `AI_JOBS=on`.
+- **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations
+  (`app_settings`, AES-256-GCM with a key from AUTH_SECRET, 30 s cache). Use it for every integration key; never read
+  those from `process.env` directly. The worker checks keys at run time, so saving in Admin needs no restart.
+- **Sheets:** the Apps Script `deploy/sheets-push.gs` (runs in Imran's Google account every 30 min) uploads the sheet
+  exports to `POST /api/integrations/sheets`; `runKcSync()` runs `scripts/kc_sync.py` and writes calls_daily/sales_team.
+  The service-account pull (`sheets_sync`) is the alternative.
+- **Deploy:** production is `/opt/business-os` on the VPS (os.osmanhadi.live). `deploy/update.sh` (systemd timer
+  `bos-update`, every 5 min) pulls `claude/nice-wright-ngqxec` and rebuilds when it changed — **a push to that branch
+  goes live within minutes**, so run `npm run typecheck && npm test` before pushing. First install: `deploy/setup-vps.sh`.
 - **API:** `/api/v1/docs/:collection[/:id]` (GET/POST/PUT/PATCH/DELETE, `If-Match` versions), `/api/v1/batch`, `/api/v1/sync`,
   `/api/v1/kb/search`, `/api/v1/reports/:business`, `/api/v1/ai/assistant`, `/api/v1/me`. Keys: `src/lib/apikeys.ts`
   (sha256 stored, shown once). Spec: `src/lib/openapi.ts` — **update it when adding endpoints**. MCP: `src/app/mcp/route.ts` + `src/lib/mcp.ts`.

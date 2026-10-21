@@ -93,3 +93,14 @@ model Job {
   @@index([status, createdAt])
   @@map("jobs")
 }
+
+/// Integration keys and settings entered in Admin → Integrations (values encrypted with AUTH_SECRET).
+/// An environment variable with the same name always wins.
+model Setting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt @map("updated_at")
+  updatedBy String?  @map("updated_by")
+
+  @@map("app_settings")
+}

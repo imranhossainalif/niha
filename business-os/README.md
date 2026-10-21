@@ -57,6 +57,15 @@ Create the owner at `/setup`, or from the shell: `npm run user:create -- you@exa
 
 ## Integrations
 
+Keys can go in `.env` **or** in `/admin` → Integrations (owner only, stored encrypted; `.env` wins). Saved keys work
+within 30 seconds, no restart.
+
+**Sales-team sheets (recommended way):** paste `deploy/sheets-push.gs` into https://script.google.com in the Google
+account that owns the sheets, put an owner API key in it, run `setup` once. It pushes the sheets every 30 minutes.
+
+**Auto-update:** after a GitHub deploy key is on the server, `bash deploy/enable-auto-update.sh` installs a timer that
+pulls the deploy branch every 5 minutes and rebuilds when it changed.
+
 | Feature | Needs | Schedule |
 |---|---|---|
 | InboxPilot AI replies | `ANTHROPIC_API_KEY`, `META_PAGE_TOKEN`, `META_APP_SECRET` | on every message |

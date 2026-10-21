@@ -82,8 +82,8 @@ export function parseDecision(text: string): AiDecision {
 }
 
 export async function decide(agentName: string, kb: string, rules: string, history: InboxMessage[]): Promise<AiDecision> {
-  const res = await anthropic().messages.create({
-    model: MODEL(),
+  const res = await (await anthropic()).messages.create({
+    model: await MODEL(),
     max_tokens: 4000,
     system: [{ type: 'text', text: systemPrompt(agentName, kb, rules), cache_control: { type: 'ephemeral' } }],
     messages: toTurns(history),

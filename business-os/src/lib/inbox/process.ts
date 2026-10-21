@@ -1,5 +1,6 @@
 // Webhook processing, AI auto-reply, team replies and history import for InboxPilot.
 import { getPath, getUrl, profileName, sendText } from '../meta/graph';
+import { cfg } from '../config';
 import { decide, hasOrder } from './ai';
 import { BUSINESS, convMessages, getConfig, knowledgeFor, lastInbound, saveMessage, updateMessage, type Channel, type InboxMessage } from './store';
 
@@ -107,7 +108,8 @@ export async function teamSend(conv: string, text: string, status: 'open' | 'don
  * Import old Messenger messages (default: last 30 days). Messages from the page are team replies;
  * the conversation id is the participant who isn't the page. Dedupe by mid.
  */
-export async function importHistory(days = 30, pageId = process.env.META_PAGE_ID || '') {
+export async function importHistory(days = 30, pageIdArg?: string) {
+  const pageId = pageIdArg || (await cfg('META_PAGE_ID')) || '';
   if (!pageId) throw new Error('META_PAGE_ID is not set');
   const since = Date.now() - days * DAY;
   let url: string | null = '/' + pageId + '/conversations?platform=messenger&limit=25&fields=updated_time,participants,messages.limit(25){id,message,from,created_time}';

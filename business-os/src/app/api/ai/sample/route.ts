@@ -33,14 +33,15 @@ const errCode = (e: unknown): string => {
 export const POST = handle(async (req: Request) => {
   await needPrincipal(req, 'write');
   const b = Body.parse(await req.json());
-  const client = anthropic();
+  const client = await anthropic();
+  const model = b.tier === 'complex' ? await MODEL_COMPLEX() : await MODEL();
   const enc = new TextEncoder();
 
   const body = new ReadableStream({
     async start(ctrl) {
       const send = (o: unknown) => ctrl.enqueue(enc.encode('data: ' + JSON.stringify(o) + '\n\n'));
       const stream = client.messages.stream({
-        model: b.tier === 'complex' ? MODEL_COMPLEX() : MODEL(),
+        model,
         max_tokens: b.max_tokens ?? 16000,
         ...(b.system ? { system: b.system } : {}),
         messages: b.messages as Anthropic.MessageParam[],

@@ -2,6 +2,7 @@
 // The spec file itself stays untouched. Each `find` must occur exactly once, or the page refuses to load
 // (so a change to the legacy file can't silently drop a patch). Remove a patch once its tab is ported natively.
 import { SALES_LIVE_JS } from './salesLive';
+import { ORDER_SOURCE_JS } from './orderSource';
 
 export type Patch = { name: string; find: string; replace: string };
 
@@ -51,6 +52,11 @@ export const PATCHES: Patch[] = [
     find: "server_not_connected: 'Supermetrics connector nai. claude.ai Settings → Connectors e add korun.'",
     replace: "server_not_connected: 'Ad data er token nai. Admin → Integrations e Meta \"Ads token\" (free) ba Supermetrics key boshan.'",
   },
+  {
+    name: 'Kids Care Sales: order source card (call / WhatsApp / Messenger / website / ads) by day, month or year',
+    find: 'function bizSales(id) {',
+    replace: ORDER_SOURCE_JS + "function bizSales(id) { const __o = bizSalesBase(id); return id === 'kidscare' ? [orderSourceCard(id), ...__o] : __o; }\nfunction bizSalesBase(id) {",
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {
@@ -67,6 +73,6 @@ export function applyPatches(html: string, patches = PATCHES): string {
 export function legacyDocument(legacyHtml: string): string {
   return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<script src="/legacy/bos-shim.js"></script>\n'
     // phone width: let cards and selects shrink instead of pushing the page sideways
-    + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select{max-width:100%}</style>\n'
+    + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select,.card input{max-width:100%}</style>\n'
     + applyPatches(legacyHtml) + '\n</html>\n';
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { inTransit, pyRound, salesDaily, slim, type NuportOrder } from '@/lib/calc/nuport';
+import { inTransit, orderChannel, pyRound, salesDaily, slim, type NuportOrder } from '@/lib/calc/nuport';
 
 const o = (id: number, created: string, status: string, total: number, extra: Partial<NuportOrder> = {}): NuportOrder => ({ id, created, status, total, is_return: false, delivered_at: null, ...extra });
 
@@ -36,10 +36,42 @@ describe('nuport → sales_daily', () => {
     expect(inTransit([d18, d19])).toEqual({ orders: 2, amount: 650 + 800 });
   });
   it('slims a Nuport API order without customer data', () => {
-    const s = slim({ internalId: 9, createdAt: 'x', status: 'COMPLETED', deliveryStatus: 'DELIVERED', totalAmount: 10, isReturn: false, deliveredAt: 'y', customer: { name: 'A', phone: '01' } });
-    expect(s).toEqual({ id: 9, created: 'x', status: 'COMPLETED', delivery_status: 'DELIVERED', total: 10, is_return: false, delivered_at: 'y' });
+    const s = slim({ internalId: 9, createdAt: 'x', status: 'COMPLETED', deliveryStatus: 'DELIVERED', totalAmount: 10, isReturn: false, deliveredAt: 'y', customer: { name: 'A', phone: '01' },
+      source: 'WEBSITE', authorId: 'u1', metadata: { origin: 'fb', utmMedium: 'paid', sourceType: 'utm', campaignId: '1202', ipAddress: '1.2.3.4', userAgent: 'x' } });
+    expect(s).toEqual({ id: 9, created: 'x', status: 'COMPLETED', delivery_status: 'DELIVERED', total: 10, is_return: false, delivered_at: 'y',
+      source: 'WEBSITE', custom_source: null, web_origin: 'fb', utm_medium: 'paid', source_type: 'utm', campaign_id: '1202', web_meta: true, author: 'u1' });
+    expect(JSON.stringify(s)).not.toMatch(/01|1\.2\.3\.4|phone/);
   });
   it('pyRound matches Python round()', () => {
     expect([0.5, 1.5, 2.5, 2.4, 2.6, 1234.5].map(pyRound)).toEqual([0, 2, 2, 2, 3, 1234]);
+  });
+});
+
+describe('order channels', () => {
+  const o = (x: Partial<NuportOrder>): NuportOrder => ({ id: 1, created: '2026-10-20T04:00:00Z', status: 'COMPLETED', total: 100, ...x });
+  it('classifies Nuport sources and website sessions', () => {
+    expect(orderChannel(o({ source: 'UP_SELL' }))).toBe('call');
+    expect(orderChannel(o({ source: 'WHATSAPP' }))).toBe('whatsapp');
+    expect(orderChannel(o({ source: 'MESSENGER' }))).toBe('messenger');
+    expect(orderChannel(o({ source: 'WEBSITE', web_origin: 'fb', utm_medium: 'paid', campaign_id: '12' }))).toBe('web_ads');
+    expect(orderChannel(o({ source: 'WEBSITE', web_origin: 'google', utm_medium: 'organic', source_type: 'organic' }))).toBe('web_organic');
+    expect(orderChannel(o({ source: 'WEBSITE', web_origin: '(direct)', source_type: 'typein' }))).toBe('web_direct');
+    expect(orderChannel(o({ source: 'WEBSITE', web_origin: 'ads.tiktok.com', utm_medium: 'referral' }))).toBe('web_other');
+    expect(orderChannel(o({ source: 'WEBSITE' }))).toBe('web_other');
+    expect(orderChannel(o({ source: 'OFFLINE' }))).toBe('offline');
+    expect(orderChannel(o({ source: 'OTHER' }))).toBe('other');
+    expect(orderChannel(o({}))).toBe('unknown');
+  });
+  it('splits a day by channel only when every order has a source', () => {
+    const day = salesDaily([
+      o({ source: 'UP_SELL', status: 'COMPLETED', total: 1000 }),
+      o({ source: 'UP_SELL', status: 'IN_TRANSIT', total: 500.5 }),
+      o({ source: 'WEBSITE', utm_medium: 'paid', status: 'CANCELLED', total: 700 }),
+    ], ['2026-10-20'])[0];
+    expect(day.by_channel).toEqual({
+      call: { orders: 2, cancelled: 0, sent: 2, sent_amount: 1500, in_transit: 1, in_transit_amount: 500, delivered: 1, delivered_amount: 1000, returned: 0 },
+      web_ads: { orders: 1, cancelled: 1, sent: 0, sent_amount: 0, in_transit: 0, in_transit_amount: 0, delivered: 0, delivered_amount: 0, returned: 0 },
+    });
+    expect(salesDaily([o({ source: 'UP_SELL' }), o({})], ['2026-10-20'])[0].by_channel).toBeUndefined();
   });
 });

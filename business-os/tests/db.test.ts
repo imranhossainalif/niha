@@ -97,4 +97,20 @@ describe.skipIf(!HAS_DB)('nuport job (mocked API)', () => {
     const d19 = await db().collection('sales_daily').doc('kidscare_2026-10-19').get();
     expect(d19!.data).toMatchObject({ delivered: 1, delivered_amount: 500 });
   });
+
+  it('backfills older orders and splits days by channel', async () => {
+    orders[980] = { internalId: 80, createdAt: '2026-09-20T04:00:00Z', status: 'COMPLETED', totalAmount: 300, source: 'WHATSAPP', deliveredAt: '2026-09-22T04:00:00Z' };
+    orders[990] = { internalId: 90, createdAt: '2026-10-15T06:00:00Z', status: 'COMPLETED', totalAmount: 900, source: 'WEBSITE', metadata: { origin: 'fb', utmMedium: 'paid', campaignId: '7' } };
+    Object.assign(orders[1002], { source: 'UP_SELL' }); Object.assign(orders[1003], { source: 'UP_SELL' }); Object.assign(orders[1001], { source: 'MESSENGER' });
+    // orders stored before sources were kept have no source field at all
+    const { db: dbx } = await import('@/lib/db');
+    for (const so of [1001, 1002, 1003]) { const d = (await dbx().collection('nuport_orders').doc(String(so)).get())!.data; const { source, custom_source, web_origin, utm_medium, source_type, campaign_id, web_meta, author, ...rest } = d as Record<string, unknown>; await dbx().collection('nuport_orders').doc(String(so)).set(rest); }
+    const { nuportBackfill } = await import('@/lib/jobs/nuport');
+    const r = await nuportBackfill({ key: 'k', fromDate: '2026-09-01', today: '2026-10-20' });
+    expect(r).toMatchObject({ refetched: 3, added: 2 });
+    const { db } = await import('@/lib/db');
+    const d15 = await db().collection('sales_daily').doc('kidscare_2026-10-15').get();
+    expect(d15!.data.orders).toBe(3);
+    expect(d15!.data.by_channel).toMatchObject({ call: { orders: 2, cancelled: 1 }, web_ads: { orders: 1, delivered: 1, delivered_amount: 900 } });
+  });
 });

@@ -2,13 +2,14 @@
 // (from Admin, POST /api/inbox/import, or the API).
 import { prisma } from '../prisma';
 import { importHistory } from '../inbox/process';
-import { nuportSync } from './nuport';
+import { nuportBackfill, nuportSync } from './nuport';
 import { sheetsSync } from './sheets';
 import { backup } from './backup';
 import { competitorWeekly, growthWeekly, learningNudge, loanPlan } from './ai_jobs';
 
 export const JOBS: Record<string, (params: any) => Promise<unknown>> = {
   nuport_sync: () => nuportSync(),
+  nuport_backfill: (p) => nuportBackfill({ fromDate: String(p?.from_date || '') }),
   sheets_sync: () => sheetsSync(),
   inbox_import: (p) => importHistory(Number(p?.days) || 30),
   backup: () => backup(),

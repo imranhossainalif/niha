@@ -46,6 +46,11 @@ export const PATCHES: Patch[] = [
     find: '  return [kcSprint(true), tiles, mergeNote, dayCard',
     replace: '  return [...stLiveCards(REPS, L), kcSprint(true), tiles, mergeNote, dayCard',
   },
+  {
+    name: 'Ad data: point to Admin → Integrations instead of claude.ai connectors',
+    find: "server_not_connected: 'Supermetrics connector nai. claude.ai Settings → Connectors e add korun.'",
+    replace: "server_not_connected: 'Ad data er token nai. Admin → Integrations e Meta \"Ads token\" (free) ba Supermetrics key boshan.'",
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {

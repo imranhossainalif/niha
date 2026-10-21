@@ -13,6 +13,7 @@ export const CONFIG_FIELDS = [
   { key: 'META_PAGE_TOKEN', label: 'Page access token', group: 'Meta (InboxPilot)', secret: true, help: 'Meta app → Messenger → Access tokens' },
   { key: 'META_APP_SECRET', label: 'App secret', group: 'Meta (InboxPilot)', secret: true, help: 'Meta app → Settings → Basic' },
   { key: 'META_VERIFY_TOKEN', label: 'Webhook verify token', group: 'Meta (InboxPilot)', secret: false, help: 'same text in Meta app → Webhooks' },
+  { key: 'META_ADS_TOKEN', label: 'Ads token (ads_read, free Supermetrics bikolpo)', group: 'Meta (InboxPilot)', secret: true, help: 'Business Settings → System users → Generate token' },
   { key: 'NUPORT_API_KEY', label: 'Nuport API key', group: 'Nuport', secret: true, help: 'Kids Care orders' },
   { key: 'NUPORT_START_SO', label: 'First run: last SO number already counted', group: 'Nuport', secret: false, help: 'e.g. 12345 (only used once)' },
   { key: 'SHEETS_PUSH_ENABLED', label: 'Accept pushes from the Google Apps Script', group: 'Google Sheets', secret: false, help: 'on/off (default on)' },

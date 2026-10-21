@@ -114,9 +114,10 @@ export async function nuportBackfill(opts: { fromDate: string; key?: string; tod
     low = n;
     if (!o || (bdDate(o.created) ?? '9999') < opts.fromDate) break;
   }
-  // 3. everything between low and the oldest stored order
+  // 3. everything between low and the oldest stored order, newest first: if the job is stopped part-way,
+  //    what is stored stays contiguous and the next run carries on from the new oldest order
   let added = 0;
-  const nums = Array.from({ length: Math.max(0, minSo - low) }, (_, i) => low + i);
+  const nums = Array.from({ length: Math.max(0, minSo - low) }, (_, i) => minSo - 1 - i);
   for (let i = 0; i < nums.length; i += 40) {
     const chunk = nums.slice(i, i + 40);
     const got = await pool(chunk, 4, (x) => fetchOrder(x, key).catch(() => null));

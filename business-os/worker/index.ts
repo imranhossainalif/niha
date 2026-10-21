@@ -7,6 +7,8 @@ import { prisma } from '../src/lib/prisma';
 import { cfg, envVal, isOn, type ConfigKey } from '../src/lib/config';
 
 const TZ = { timezone: 'Asia/Dhaka' };
+// long jobs that pick up where they stopped, so a restart just queues them again
+const RESUMABLE = ['nuport_backfill', 'inbox_import'];
 /** Run `kind` on `expr` when every key in `needs` is set (and `flag`, if given, is on). */
 const schedule = (expr: string, kind: string, needs: ConfigKey[] = [], flag?: ConfigKey, params: unknown = {}) => {
   cron.schedule(expr, async () => {
@@ -18,8 +20,13 @@ const schedule = (expr: string, kind: string, needs: ConfigKey[] = [], flag?: Co
 };
 
 async function main() {
-  // stale "running"/"claimed" rows from a crash
-  await prisma.job.updateMany({ where: { status: { in: ['running', 'claimed'] } }, data: { status: 'failed', error: 'Worker restarted', finishedAt: new Date() } });
+  // jobs cut off by a restart (crash or deploy): mark failed, and queue again the ones that can resume
+  const cut = await prisma.job.findMany({ where: { status: { in: ['running', 'claimed'] } } });
+  await prisma.job.updateMany({ where: { id: { in: cut.map((j) => j.id) } }, data: { status: 'failed', error: 'Worker restarted', finishedAt: new Date() } });
+  for (const j of cut.filter((x) => RESUMABLE.includes(x.kind))) {
+    await prisma.job.create({ data: { kind: j.kind, params: j.params as object, createdBy: (j.createdBy || 'system') + ' (resumed)' } });
+    console.log('[worker] re-queued', j.kind);
+  }
 
   schedule('50 8,13,20 * * *', 'nuport_sync', ['NUPORT_API_KEY']);
   schedule('55 8,13,20 * * *', 'sheets_sync', ['GOOGLE_SERVICE_ACCOUNT_JSON', 'KC_SHEET_CALL_LIVE']);

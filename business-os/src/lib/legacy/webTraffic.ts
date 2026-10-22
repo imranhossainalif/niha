@@ -114,7 +114,8 @@ function webTodayCard(id) {
   const done = trend.filter((r) => r.has && !r.part); const best = [...done].sort((a, b) => b.s - a.s)[0];
   const gName = { day: 'din', week: 'shoptah', month: 'mash' }[wtGran];
   const all = (S.web_traffic || []).filter((r) => (r.business || 'kidscare') === id && r.date).map((r) => r.date).sort();
-  return card('🌐 Website traffic · ' + lbl, 'Google Analytics (GA4) · ' + (W.last ? 'update ' + ago(W.last) : '') + ' · 15 min por por · GA4 ajker hishab kichu ghonta pichiye thake', el('div', { class: 'ctrls' }, pSel),
+  const pn = ((S.web_traffic || []).filter((r) => (r.business || 'kidscare') === id && r.date && r.property_name).sort((x, y) => y.date.localeCompare(x.date))[0] || {}).property_name;
+  return card('🌐 Website traffic · ' + lbl, 'Google Analytics (GA4)' + (pn ? ': ' + pn : '') + ' · ' + (W.last ? 'update ' + ago(W.last) : '') + ' · 15 min por por · GA4 ajker hishab kichu ghonta pichiye thake', el('div', { class: 'ctrls' }, pSel),
     RT ? el('div', { class: 'banner', style: 'background:var(--soft);border-color:var(--line)' }, el('b', {}, '🟢 Ekhon website e: ' + (RT.activeUsers || 0) + ' jon'), rtFresh ? '' : ' (' + ago(RT.asof) + ' er hishab)',
       (RT.pages || []).length ? el('div', { class: 'note' }, 'Dekhche: ' + RT.pages.slice(0, 5).map((p) => p.page.slice(0, 40) + ' (' + p.users + ')').join(' · ')) : null,
       (RT.devices || []).length ? el('div', { class: 'note' }, RT.devices.map((d) => d.device + ' ' + d.users).join(' · ')) : null) : null,

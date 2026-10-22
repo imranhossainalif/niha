@@ -33,4 +33,8 @@ describe('GA4 full push', () => {
     expect(d.landing!['_']).toMatchObject({ sessions: 25, engaged_sessions: 15 });
     expect(d.devices).toEqual({ mobile: 35, desktop: 5 });
   });
+  it('keeps each business separate (lrf push → lrf docs)', () => {
+    const d = trafficDocs({ property: '1', business: 'lrf', days: [{ date: '20261022', sessions: 5, users: 4 }] });
+    expect(d[0]).toMatchObject({ date: '2026-10-22', business: 'lrf', total: { sessions: 5 } });
+  });
 });

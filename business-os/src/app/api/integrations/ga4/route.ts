@@ -10,6 +10,8 @@ export const maxDuration = 300;
 const num = z.coerce.number().optional();
 const Body = z.object({
   property: z.string().max(40),
+  business: z.enum(['kidscare', 'lrf']), // required: an old script without it pushed one site's data into the other's dashboard
+  propertyName: z.string().max(200).optional(),
   rows: z.array(z.object({ date: z.string(), source: z.string().default(''), medium: z.string().default(''), sessions: z.coerce.number(), users: z.coerce.number(), newUsers: num, purchases: num, revenue: num })).max(200000).optional(),
   days: z.array(z.object({ date: z.string(), sessions: z.coerce.number(), users: z.coerce.number(), newUsers: num, engagedSessions: num, views: num, engagementSec: num, addToCarts: num, checkouts: num, purchases: num, revenue: num })).max(5000).optional(),
   pages: z.array(z.object({ date: z.string(), page: z.string().max(500), title: z.string().max(300).optional(), views: z.coerce.number(), users: z.coerce.number(), engagementSec: num })).max(200000).optional(),

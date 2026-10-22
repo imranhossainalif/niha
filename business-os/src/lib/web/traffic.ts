@@ -1,6 +1,7 @@
 // Website traffic from Google Analytics 4, pushed by the Apps Script (deploy/sheets-push.gs → pushGA4).
 // One doc per day in web_traffic (totals, per source/medium, pages, landing pages, devices, cities) plus
-// web_traffic/kidscare_realtime (visitors right now). Only additive counts are stored, so any range can be summed:
+// web_traffic/<business>_realtime (visitors right now). Doc ids are <business>_<date> (kidscare, lrf).
+// Only additive counts are stored, so any range can be summed:
 // bounce rate = 1 − engaged_sessions / sessions, avg engagement = engagement_sec / sessions.
 import { db } from '../db';
 
@@ -10,7 +11,7 @@ export type GaPage = { date: string; page: string; title?: string; views: number
 export type GaLanding = { date: string; page: string; sessions: number; engagedSessions?: number };
 export type GaDim = { date: string; key: string; sessions: number; users?: number };
 export type GaRealtime = { activeUsers: number; pages?: { page: string; users: number }[]; sources?: { source: string; users: number }[]; devices?: { device: string; users: number }[] };
-export type GaPush = { property: string; rows?: GaRow[]; days?: GaDay[]; pages?: GaPage[]; landing?: GaLanding[]; devices?: GaDim[]; cities?: GaDim[]; realtime?: GaRealtime };
+export type GaPush = { property: string; business?: string; propertyName?: string; rows?: GaRow[]; days?: GaDay[]; pages?: GaPage[]; landing?: GaLanding[]; devices?: GaDim[]; cities?: GaDim[]; realtime?: GaRealtime };
 
 type Bucket = { sessions: number; users: number; new_users: number; purchases: number; revenue: number };
 type DayDoc = {
@@ -27,8 +28,9 @@ const key = (s: string) => s.replace(/[.$/#[\]]/g, '_').slice(0, 150) || '(none)
 const topN = <T,>(o: Record<string, T>, by: (x: T) => number, k: number) => Object.fromEntries(Object.entries(o).sort((a, b) => by(b[1]) - by(a[1])).slice(0, k));
 
 /** Group a push into one doc per day. */
-export function trafficDocs(push: GaPush | GaRow[], business = 'kidscare'): DayDoc[] {
+export function trafficDocs(push: GaPush | GaRow[], business?: string): DayDoc[] {
   const p: GaPush = Array.isArray(push) ? { property: '', rows: push } : push;
+  business = business ?? p.business ?? 'kidscare';
   const days: Record<string, DayDoc> = {};
   const z = (): Bucket => ({ sessions: 0, users: 0, new_users: 0, purchases: 0, revenue: 0 });
   const day = (raw: string) => { const date = isoDate(raw); return okDate(date) ? (days[date] ??= { date, business, total: { ...z() }, by_source: {} }) : null; };
@@ -70,14 +72,15 @@ export function trafficDocs(push: GaPush | GaRow[], business = 'kidscare'): DayD
 /** Save a push. Parts not in this push (e.g. pages on an hourly run) keep their stored values. */
 export async function saveTraffic(push: GaPush | GaRow[], property?: string) {
   const p: GaPush = Array.isArray(push) ? { property: property ?? '', rows: push } : push;
-  const docs = trafficDocs(p);
+  const business = p.business || 'kidscare';
+  const docs = trafficDocs(p, business);
   const col = db().collection('web_traffic');
   const asof = new Date().toISOString();
   for (const d of docs) {
-    const ref = col.doc('kidscare_' + d.date);
+    const ref = col.doc(business + '_' + d.date);
     const cur = (await ref.get())?.data ?? {};
-    await ref.set({ ...cur, ...d, ...(Object.keys(d.by_source).length ? {} : { by_source: cur.by_source ?? {} }), property: p.property, asof });
+    await ref.set({ ...cur, ...d, ...(Object.keys(d.by_source).length ? {} : { by_source: cur.by_source ?? {} }), property: p.property, property_name: p.propertyName ?? cur.property_name ?? '', asof });
   }
-  if (p.realtime) await col.doc('kidscare_realtime').set({ business: 'kidscare', date: '', realtime: true, ...p.realtime, property: p.property, asof });
-  return { days: docs.length, sessions: docs.reduce((s, d) => s + d.total.sessions, 0), realtime: p.realtime?.activeUsers ?? null };
+  if (p.realtime) await col.doc(business + '_realtime').set({ business, date: '', realtime: true, ...p.realtime, property: p.property, property_name: p.propertyName ?? '', asof });
+  return { business, days: docs.length, sessions: docs.reduce((s, d) => s + d.total.sessions, 0), realtime: p.realtime?.activeUsers ?? null };
 }

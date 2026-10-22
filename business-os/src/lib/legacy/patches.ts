@@ -89,6 +89,11 @@ export const PATCHES: Patch[] = [
     find: 'sales: bizSales, salesteam: bizSalesTeam, finance: bizFinance, operations: bizOperations, product: bizProduct, content: bizContent, team: bizTeam',
     replace: 'sales: bizSales, salesteam: bizSalesTeam, attendance: attendanceView, finance: bizFinance, operations: bizOperations, product: bizProduct, content: bizContent, team: bizTeam',
   },
+  {
+    name: 'LRF Briefing: website traffic card (GA4, business lrf)',
+    find: "if (tab === 'briefing') return [...agBriefing(), r90Card(id), ...bizBriefing(id)].filter(Boolean);",
+    replace: "if (tab === 'briefing') return [...agBriefing(), webTodayCard(id), r90Card(id), ...bizBriefing(id)].filter(Boolean);",
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {

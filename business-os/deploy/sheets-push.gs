@@ -56,11 +56,17 @@ function push() {
 /* ---------------- Google Analytics 4 → Business OS (website traffic) ----------------
  * Setup (once):
  *  1. Left menu "Services" (+) → add "Google Analytics Data API" (AnalyticsData) AND "Google Analytics Admin API" (AnalyticsAdmin).
- *  2. GA4_PROPERTY: the Measurement ID (G-…) or the numeric Property ID both work.
+ *  2. GA4_SITES: each business's own website Measurement ID (G-…) or numeric Property ID. Find it in GA4 →
+ *     Admin → Data streams → click the website → "Measurement ID". Leave '' for a business without GA4.
+ *     Kids Care's ID goes ONLY in kidscare, Local Revenue Flow's ONLY in lrf — otherwise the dashboards mix.
  *  3. Choose function "setupGA4" → Run → allow. It sends history once (~14 months totals, 3 months of pages),
  *     then every 15 minutes: visitors right now + today and yesterday.
+ *  The log shows which GA4 property each business got ("kidscare → 1234 (Kids Care BD)") — check it once.
  */
-const GA4_PROPERTY = 'G-NEP6NGZB28';
+const GA4_SITES = {
+  kidscare: '',               // Kids Care BD website (kidscarebd…) — G-XXXXXXXXXX
+  lrf: 'G-NEP6NGZB28',        // Local Revenue Flow website
+};
 const GA4_URL = 'https://os.osmanhadi.live/api/integrations/ga4';
 
 function setupGA4() {
@@ -69,29 +75,27 @@ function setupGA4() {
   pushGA4({ totalsDays: 420, detailDays: 90 });
 }
 
-/** Numeric property id: as given, or found from a Measurement ID (G-…) through the Analytics Admin API (cached). */
-function ga4PropertyId_() {
-  if (/^\d+$/.test(GA4_PROPERTY)) return GA4_PROPERTY;
+/** {id, name} of the GA4 property: as given (numeric), or found from a Measurement ID (G-…) through the Analytics Admin API (cached). */
+function ga4Property_(mid) {
   var props = PropertiesService.getScriptProperties();
-  var cached = props.getProperty('GA4_ID_' + GA4_PROPERTY);
-  if (cached) return cached;
-  if (!/^G-/.test(GA4_PROPERTY)) throw new Error('GA4_PROPERTY must be the Measurement ID (G-…) or the numeric Property ID');
+  var cached = props.getProperty('GA4P_' + mid);
+  if (cached) return JSON.parse(cached);
+  var want = /^\d+$/.test(mid) ? 'properties/' + mid : null;
+  if (!want && !/^G-/.test(mid)) throw new Error('GA4_SITES value must be a Measurement ID (G-…) or a numeric Property ID: ' + mid);
   var accounts = AnalyticsAdmin.AccountSummaries.list({ pageSize: 200 }).accountSummaries || [];
   for (var a = 0; a < accounts.length; a++) {
     var ps = accounts[a].propertySummaries || [];
     for (var p = 0; p < ps.length; p++) {
-      var streams = AnalyticsAdmin.Properties.DataStreams.list(ps[p].property).dataStreams || [];
-      for (var k = 0; k < streams.length; k++) {
-        if (streams[k].webStreamData && streams[k].webStreamData.measurementId === GA4_PROPERTY) {
-          var id = ps[p].property.split('/')[1];
-          Logger.log('GA4 property for ' + GA4_PROPERTY + ': ' + id + ' (' + ps[p].displayName + ')');
-          props.setProperty('GA4_ID_' + GA4_PROPERTY, id);
-          return id;
-        }
+      var hit = want ? ps[p].property === want : (AnalyticsAdmin.Properties.DataStreams.list(ps[p].property).dataStreams || [])
+        .some(function (s) { return s.webStreamData && s.webStreamData.measurementId === mid; });
+      if (hit) {
+        var out = { id: ps[p].property.split('/')[1], name: ps[p].displayName || '' };
+        props.setProperty('GA4P_' + mid, JSON.stringify(out));
+        return out;
       }
     }
   }
-  throw new Error('No GA4 property with ' + GA4_PROPERTY + ' is visible to this Google account. Give it Viewer access in GA4 → Admin → Property access management.');
+  throw new Error('No GA4 property for ' + mid + ' is visible to this Google account. Give it Viewer access in GA4 → Admin → Property access management.');
 }
 
 /** One GA4 report as plain objects: {dim1: value, …, met1: number, …}. */
@@ -109,9 +113,19 @@ function ga4Report_(pid, days, dims, mets, extra) {
 
 function pushGA4(opts) {
   opts = opts && opts.totalsDays ? opts : { totalsDays: 2, detailDays: 2 }; // a time trigger passes an event object
-  var pid = ga4PropertyId_();
+  var errors = [];
+  Object.keys(GA4_SITES).forEach(function (biz) {
+    if (!GA4_SITES[biz]) return;
+    try { pushGA4Site_(biz, GA4_SITES[biz], opts); } catch (e) { errors.push(biz + ': ' + e); Logger.log(biz + ' failed: ' + e); }
+  });
+  if (errors.length) throw new Error(errors.join(' | '));
+}
+
+function pushGA4Site_(biz, mid, opts) {
+  var prop = ga4Property_(mid), pid = prop.id;
+  Logger.log(biz + ' → GA4 property ' + pid + ' (' + prop.name + ')');
   var T = opts.totalsDays, D = opts.detailDays;
-  var payload = { property: pid };
+  var payload = { property: pid, business: biz, propertyName: prop.name };
   payload.rows = ga4Report_(pid, T, ['date', 'sessionSource', 'sessionMedium'], ['sessions', 'totalUsers', 'newUsers', 'ecommercePurchases', 'purchaseRevenue'])
     .map(function (r) { return { date: r.date, source: r.sessionSource, medium: r.sessionMedium, sessions: r.sessions, users: r.totalUsers, newUsers: r.newUsers, purchases: r.ecommercePurchases, revenue: r.purchaseRevenue }; });
   payload.days = ga4Report_(pid, T, ['date'], ['sessions', 'totalUsers', 'newUsers', 'engagedSessions', 'screenPageViews', 'userEngagementDuration', 'addToCarts', 'checkouts', 'ecommercePurchases', 'purchaseRevenue'])
@@ -134,6 +148,6 @@ function pushGA4(opts) {
     };
   } catch (e) { Logger.log('realtime skipped: ' + e); }
   var r = UrlFetchApp.fetch(GA4_URL, { method: 'post', contentType: 'application/json', payload: JSON.stringify(payload), headers: { Authorization: 'Bearer ' + BOS_API_KEY }, muteHttpExceptions: true });
-  Logger.log(r.getResponseCode() + ' ' + r.getContentText().slice(0, 300));
+  Logger.log(biz + ' ' + r.getResponseCode() + ' ' + r.getContentText().slice(0, 300));
   if (r.getResponseCode() !== 200) throw new Error('Business OS answered ' + r.getResponseCode() + ': ' + r.getContentText().slice(0, 300));
 }

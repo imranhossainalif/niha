@@ -5,6 +5,7 @@ import { collectionCounts, db } from '@/lib/db';
 import { BIZ } from '@/lib/business';
 import { isFull } from '@/lib/access';
 import { bdToday, daysTo } from '@/lib/time';
+import { Brand } from '@/components/Brand';
 
 export const dynamic = 'force-dynamic';
 const tk = (n: number) => '৳' + Math.round(n).toLocaleString('en-IN');
@@ -32,7 +33,7 @@ export default async function Home() {
     <main className="mx-auto grid max-w-5xl gap-4 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <h1 className="text-2xl font-semibold">Business OS</h1>
+          <h1 className="sr-only">EasyFounder</h1><Brand height={40} />
           <p className="muted text-sm">{p.email} · {p.role} · {today} (Dhaka)</p>
         </div>
         <nav className="flex flex-wrap gap-2">

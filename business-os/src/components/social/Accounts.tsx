@@ -89,12 +89,12 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
           <li>Dashboard → <b>Settings</b> → Meta card → "Key bosan" → <i>Social media token</i> e paste → Save. Tarpor upore <b>"Page / Instagram khujun"</b>.</li>
         </Guide>
         <Guide net="youtube" title="YouTube setup (Google)">
-          <li><a className="lnk" href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">console.cloud.google.com</a> e notun project: naam <i>Business OS</i>.</li>
+          <li><a className="lnk" href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">console.cloud.google.com</a> e notun project: naam <i>EasyFounder</i>.</li>
           <li><a className="lnk" href="https://console.cloud.google.com/apis/library/youtube.googleapis.com" target="_blank" rel="noreferrer">YouTube Data API v3</a> → <b>Enable</b>.</li>
-          <li><i>Google Auth Platform</i> (OAuth consent screen) → Get started → App name <i>Business OS</i>, apnar email → Audience: <b>External</b> → Create. Tarpor <i>Audience</i> e <b>Publish app</b> chapun (na hole 7 din por por login abar lagbe).</li>
+          <li><i>Google Auth Platform</i> (OAuth consent screen) → Get started → App name <i>EasyFounder</i>, apnar email → Audience: <b>External</b> → Create. Tarpor <i>Audience</i> e <b>Publish app</b> chapun (na hole 7 din por por login abar lagbe).</li>
           <li><i>Clients</i> → Create client → <b>Web application</b> → <i>Authorized redirect URIs</i> e eta din: <CopyCode text={cb + 'youtube/callback'} /> → Create → <b>Client ID</b> ar <b>Client secret</b> copy.</li>
           <li>Dashboard → Settings → "YouTube + TikTok" → client ID ar secret boshan → Save.</li>
-          <li>Upore <b>"Google diye connect"</b> → je Google account e Kids Care er channel ache seta bachai (brand channel hole channel ta bachai) → "Google hasn't verified this app" ashle <i>Advanced → Go to Business OS</i> → Allow.</li>
+          <li>Upore <b>"Google diye connect"</b> → je Google account e Kids Care er channel ache seta bachai (brand channel hole channel ta bachai) → "Google hasn't verified this app" ashle <i>Advanced → Go to EasyFounder</i> → Allow.</li>
           <li><b>Jene rakhun:</b> Google er niyome audit na hoya porjonto API diye upload kora video <b>private</b> thake — YouTube Studio theke Public korte hobe. Audit er jonno <a className="lnk" href="https://support.google.com/youtube/contact/yt_api_form" target="_blank" rel="noreferrer">ei form</a> fill korun (free, 1-3 shoptah). Din e ~6 ta upload er limit (quota).</li>
         </Guide>
         <Guide net="tiktok" title="TikTok setup">

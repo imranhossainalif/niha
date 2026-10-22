@@ -20,7 +20,7 @@ export async function POST(req: Request) {
   const one = async (m: Rpc) => {
     if (m.id === undefined) return null; // notification
     switch (m.method) {
-      case 'initialize': return reply(m.id, { protocolVersion: m.params?.protocolVersion || PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: 'business-os', version: '1.0.0' }, instructions: 'Imran\'s Business OS. Collections are listed in docs/DATA_MODEL.md; use list_collections first. Label analysis FACT vs HYPOTHESIS.' });
+      case 'initialize': return reply(m.id, { protocolVersion: m.params?.protocolVersion || PROTOCOL, capabilities: { tools: {} }, serverInfo: { name: 'business-os', version: '1.0.0' }, instructions: 'Imran\'s EasyFounder (business OS). Collections are listed in docs/DATA_MODEL.md; use list_collections first. Label analysis FACT vs HYPOTHESIS.' });
       case 'ping': return reply(m.id, {});
       case 'tools/list': return reply(m.id, { tools: tools.map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema })) });
       case 'tools/call': {

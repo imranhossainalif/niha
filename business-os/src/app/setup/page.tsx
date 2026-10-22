@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/prisma';
 import { signIn } from '@/auth';
+import { Brand } from '@/components/Brand';
 
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +26,8 @@ export default async function Setup({ searchParams }: { searchParams: Promise<{ 
   return (
     <main className="mx-auto mt-24 max-w-sm px-4">
       <form action={create} className="card grid gap-3">
-        <h1 className="text-xl font-semibold">Business OS · Prothom setup</h1>
+        <div className="flex justify-center py-2"><Brand height={52} /></div>
+        <h1 className="text-center text-lg font-semibold">Prothom setup</h1>
         <p className="muted text-sm">Owner account banan. {process.env.ADMIN_EMAIL ? 'Email hobe ' + process.env.ADMIN_EMAIL + '.' : ''}</p>
         {sp.error === '1' && <p className="text-sm text-red-600">Thik email ar kompokkhe 10 okkhorer password din.</p>}
         {sp.error === '2' && <p className="text-sm text-red-600">Ei email diye owner banano jabe na (ADMIN_EMAIL dekhun).</p>}

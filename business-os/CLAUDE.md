@@ -1,6 +1,6 @@
-# Business OS — notes for Claude Code
+# EasyFounder (formerly "Business OS") — notes for Claude Code
 
-Self-hosted business OS for Imran Hossain Alif (Bangladesh). The original brief is `docs/ORIGINAL_BRIEF.md`
+Self-hosted business OS for Imran Hossain Alif (Bangladesh), branded **EasyFounder** (logo files in `public/brand/`: `logo.png` green, `logo-white.png` for dark backgrounds, `mark*.png`, favicons). The original brief is `docs/ORIGINAL_BRIEF.md`
 (build order, product rules, integrations) — read it before large changes. Keep this file current when the architecture changes.
 
 ## Non-negotiable product rules

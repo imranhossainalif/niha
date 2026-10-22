@@ -155,6 +155,26 @@ export const PATCHES: Patch[] = [
     find: 'function bizCalendar(id) {',
     replace: SOCIAL_JS + 'function bizCalendar(id) {',
   },
+  {
+    name: 'Brand: EasyFounder (tab title)',
+    find: '<title>Business OS</title>',
+    replace: '<title>EasyFounder</title>',
+  },
+  {
+    name: 'Brand: EasyFounder logo in the sidebar (full logo on desktop, mark on phones)',
+    find: '<div class="brand"><i>B</i>Business OS</div>',
+    replace: '<a class="brand" href="#overview" aria-label="EasyFounder" style="text-decoration:none"><img src="/brand/logo-white.png" alt="EasyFounder" style="width:100%;max-width:196px;height:auto;display:block"></a><a class="brand-m" href="#overview" aria-label="EasyFounder"><img src="/brand/mark-white.png" alt="EasyFounder" style="height:30px;width:30px;display:block"></a>',
+  },
+  {
+    name: 'Brand: EasyFounder in the breadcrumb',
+    find: "replaceChildren('Business OS › ',",
+    replace: "replaceChildren('EasyFounder › ',",
+  },
+  {
+    name: 'Brand: EasyFounder in the AI assistant rules',
+    find: `You are the business assistant inside Imran's "Business OS" dashboard,`,
+    replace: `You are the business assistant inside Imran's "EasyFounder" dashboard,`,
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {
@@ -171,6 +191,8 @@ export function applyPatches(html: string, patches = PATCHES): string {
 export function legacyDocument(legacyHtml: string): string {
   return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<script src="/legacy/bos-shim.js"></script>\n'
     // phone width: let cards and selects shrink instead of pushing the page sideways
-    + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select,.card input{max-width:100%}</style>\n'
+    + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select,.card input{max-width:100%}'
+    + '.brand-m{display:none}@media (max-width:860px){.brand-m{display:flex;align-items:center;flex:none;padding:0 6px 0 2px}}</style>\n'
+    + '<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/brand/favicon-32.png"><link rel="apple-touch-icon" href="/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b372f">\n'
     + applyPatches(legacyHtml) + '\n</html>\n';
 }

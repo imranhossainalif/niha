@@ -23,7 +23,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   try { st = JSON.parse(jar.get('bos_oauth')?.value || '{}'); } catch { /* bad cookie */ }
   jar.delete('bos_oauth');
   const p = await requestPrincipal(req);
-  if (!p || !isFull(p)) return page(false, 'Age Business OS e owner/admin hishebe login korun.');
+  if (!p || !isFull(p)) return page(false, 'Age EasyFounder e owner/admin hishebe login korun.');
   if (u.searchParams.get('error')) return page(false, 'Login baatil: ' + (u.searchParams.get('error_description') || u.searchParams.get('error')), st.business);
   if (!st.state || st.state !== u.searchParams.get('state') || st.provider !== provider) return page(false, 'Login er shomoy shesh / mile nai — abar "Connect" chapun.', st.business);
   const code = u.searchParams.get('code');

@@ -10,7 +10,7 @@ const ok = (schema: object, d = 'OK') => ({ description: d, content: { 'applicat
 export function openapi(origin: string) {
   return {
     openapi: '3.1.0',
-    info: { title: 'Business OS API', version: '1.4.0', description: 'Read and write every Business OS collection. Auth: `Authorization: Bearer <key>` (owner creates keys in Admin). Keys act as their owner, limited to read or read+write. Staff keys only see their assigned businesses.' },
+    info: { title: 'Business OS API', version: '1.4.1', description: 'Read and write every Business OS collection. Auth: `Authorization: Bearer <key>` (owner creates keys in Admin). Keys act as their owner, limited to read or read+write. Staff keys only see their assigned businesses.' },
     servers: [{ url: origin }],
     security: [{ bearer: [] }],
     components: {

@@ -103,6 +103,8 @@ async function metaPageCheck(): Promise<Health> {
   if (pageId) {
     const { r, j } = await get(`${GRAPH}/${pageId}?fields=name,followers_count&access_token=${encodeURIComponent(token)}`);
     if (j?.name) details.unshift(['Page', j.name + (j.followers_count ? ' · ' + Number(j.followers_count).toLocaleString('en-IN') + ' follower' : '')]);
+    // reading page info needs pages_read_engagement, which messaging itself does not: only a token/page error is a problem
+    else if (j?.error?.code === 100 || j?.error?.code === 10) details.unshift(['Page', pageId + ' (naam porar permission nai — message er jonno lage na)']);
     else { statuses.push('bad'); notes.push('Page ' + pageId + ' porte parche na: ' + (j?.error?.message || r.status)); }
     const pct = usagePct(r); limits = [{ label: 'Meta API call limit', used: pct, max: 100, unit: '%', note: '100% hole Meta kichukkhon call bondho rakhe' }];
     if (pct >= 80) { statuses.push('warn'); notes.push('Meta API limit ' + pct + '% use hoyeche.'); }
@@ -231,7 +233,8 @@ async function workerCheck(): Promise<Health> {
   const since = new Date(Date.now() - 24 * HOUR);
   const [lastSched, failed, stuck, backup] = await Promise.all([
     prisma.job.findFirst({ where: { createdBy: 'schedule' }, orderBy: { createdAt: 'desc' } }),
-    prisma.job.findMany({ where: { status: 'failed', createdAt: { gte: since } }, orderBy: { createdAt: 'desc' }, take: 10 }),
+    // 'Worker restarted' = cut off by a deploy; resumable jobs are queued again, so that is not a problem
+    prisma.job.findMany({ where: { status: 'failed', createdAt: { gte: since }, NOT: { error: 'Worker restarted' } }, orderBy: { createdAt: 'desc' }, take: 10 }),
     prisma.job.findMany({ where: { status: 'running', startedAt: { lt: new Date(Date.now() - 3 * HOUR) } }, take: 5 }),
     lastJob('backup', { status: 'done' }),
   ]);

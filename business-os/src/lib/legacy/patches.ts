@@ -25,6 +25,8 @@ function socialView(id) {
       if (e.data.bosSocialDialog != null) st.d = e.data.bosSocialDialog;
       size();
       if (e.data.bosSocialFocus) host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (e.data.bosSocialToast) toast(String(e.data.bosSocialToast));
+      if (e.data.bosSocialConnected != null) f.contentWindow.postMessage({ bosSocialConnected: e.data.bosSocialConnected }, location.origin);
     });
     // follow the placeholder: shown and placed over it while it is on the page, hidden otherwise
     setInterval(() => {

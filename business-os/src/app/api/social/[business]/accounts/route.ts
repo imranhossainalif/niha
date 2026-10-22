@@ -5,6 +5,7 @@ import { needPrincipal } from '@/lib/apiutil';
 import { isFull } from '@/lib/access';
 import { needBiz } from '@/lib/social/api';
 import { discoverAccounts, socialToken } from '@/lib/social/meta';
+import { cfg, deleteSecret } from '@/lib/config';
 import type { SocialAccount } from '@/lib/jobs/social';
 
 type Ctx = { params: Promise<{ business: string }> };
@@ -16,11 +17,14 @@ export const GET = handle(async (req: Request, { params }: Ctx) => {
   const p = await needPrincipal(req);
   needBiz(p, business);
   const connected = (await db(p).collection('social_accounts').where('business', '==', business).limit(100).get()).map((s) => ({ id: s.id, ...(s.data as SocialAccount) }));
-  if (new URL(req.url).searchParams.get('discover') !== '1') return json({ connected });
+  // which logins are set up in Settings (no values)
+  const providers = { meta: !!((await cfg('META_SOCIAL_TOKEN')) || (await cfg('META_ADS_TOKEN'))), youtube: !!((await cfg('YOUTUBE_CLIENT_ID')) && (await cfg('YOUTUBE_CLIENT_SECRET'))), tiktok: !!((await cfg('TIKTOK_CLIENT_KEY')) && (await cfg('TIKTOK_CLIENT_SECRET'))) };
+  const callbackBase = (process.env.PUBLIC_URL || new URL(req.url).origin).replace(/\/$/, '') + '/api/social/oauth/';
+  if (new URL(req.url).searchParams.get('discover') !== '1') return json({ connected, providers, callbackBase });
   adminOnly(p);
   let found: Awaited<ReturnType<typeof discoverAccounts>> = [], error: string | null = null;
   try { found = await discoverAccounts(await socialToken()); } catch (e) { error = (e as Error).message; }
-  return json({ connected, found, error });
+  return json({ connected, providers, callbackBase, found, error });
 });
 
 const Body = z.object({ accounts: z.array(z.object({ network: z.enum(['facebook', 'instagram']), ext_id: z.string(), name: z.string(), username: z.string().optional(), picture: z.string().optional(), followers: z.number().optional(), page_id: z.string().optional() })).max(30) });
@@ -43,5 +47,6 @@ export const DELETE = handle(async (req: Request, { params }: Ctx) => {
   const p = await needPrincipal(req, 'write');
   needBiz(p, business, true); adminOnly(p);
   const id = new URL(req.url).searchParams.get('id') || '';
+  await deleteSecret('oauth:' + id); // YouTube/TikTok login token
   return json({ deleted: await db(p).collection('social_accounts').doc(id).delete() });
 });

@@ -59,6 +59,10 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   Wed+Sat). Media files: `src/lib/social/media.ts` → Docker volume `media`, public at `/media/<id>`. Analytics math:
   `src/lib/social/analytics.ts` (BD hours). Collections: social_accounts/posts/insights/daily/audience/competitors/settings/ai.
   Meta does not allow posting to Facebook groups by API: groups are suggestions only.
+  YouTube (`src/lib/social/youtube.ts`, Google OAuth) and TikTok (`tiktok.ts`, TikTok OAuth, FILE_UPLOAD chunks, inbox draft or
+  direct post) log in through `/api/social/oauth/[provider]/start|callback`; tokens via `saveSecret('oauth:<account>')` (encrypted,
+  never in docs), refreshed by `oauth.getAccess`. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
+  `/legal/privacy` and `/legal/terms` exist because TikTok/Google ask for them.
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations
   (`app_settings`, AES-256-GCM with a key from AUTH_SECRET, 30 s cache). Use it for every integration key; never read
   those from `process.env` directly. The worker checks keys at run time, so saving in Admin needs no restart.

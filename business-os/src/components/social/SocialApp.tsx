@@ -1,79 +1,110 @@
 'use client';
-// Social Media (Kids Care → Social Media tab): Calendar · Analytics · Suggestions · Accounts, plus the composer.
+// Social Media (Kids Care → Social Media tab): Calendar · Analytics · Ideas · Accounts, plus the composer.
+// Browser-only rendering (dates use the viewer's clock); inside the dashboard frame it reports its height.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { api, Avatar, dateLabel, NetIcon, STATUS, useFrameDialog, type Account, type Post } from './ui';
-import { Composer, type Draft } from './Composer';
+import './social.css';
+import { Icon, NET_NAME, NetLogo, NETS } from './icons';
+import { api, Avatar, compact, dateLabel, Modal, STATUS, ToastHost, useToast, type Account, type Post } from './ui';
+import { Composer, PostPreview, type BestSlot, type Draft } from './Composer';
 import { Calendar } from './Calendar';
 import { Analytics } from './Analytics';
 import { Suggestions } from './Suggestions';
 import { Accounts } from './Accounts';
 
 type Tab = 'calendar' | 'analytics' | 'ideas' | 'accounts';
-const TABS: [Tab, string][] = [['calendar', 'Calendar'], ['analytics', 'Analytics'], ['ideas', 'Suggestions'], ['accounts', 'Accounts']];
+const TABS: [Tab, string, string][] = [['calendar', 'Calendar', 'calendar'], ['analytics', 'Analytics', 'chart'], ['ideas', 'Ideas', 'spark'], ['accounts', 'Accounts', 'users']];
 
-export function SocialApp({ business, canAdmin }: { business: string; canAdmin: boolean }) {
-  // browser-only (dates use the viewer's clock, the tab comes from localStorage): nothing is rendered on the server
+export function SocialApp(props: { business: string; canAdmin: boolean; embed?: boolean }) {
   const [mounted, setMounted] = useState(false);
+  useEffect(() => {
+    setMounted(true);
+    if (props.embed) {
+      document.documentElement.classList.add('sm-embed');
+      // follow the dashboard's light/dark choice
+      try { const t = window.parent.document.documentElement.getAttribute('data-theme'); if (t) document.documentElement.setAttribute('data-theme', t); } catch { /* not same origin */ }
+    }
+  }, [props.embed]);
+  if (!mounted) return null;
+  return <ToastHost><App {...props} /></ToastHost>;
+}
+
+function App({ business, canAdmin }: { business: string; canAdmin: boolean }) {
+  const toast = useToast();
   const root = useRef<HTMLDivElement>(null);
-  const [tab, setTab] = useState<Tab>('calendar');
-  useEffect(() => { try { const t = localStorage.getItem('bos_social_tab') as Tab | null; if (t && TABS.some(([k]) => k === t)) setTab(t); } catch { /* private mode */ } setMounted(true); }, []);
+  const [tab, setTab] = useState<Tab>(() => { try { const t = localStorage.getItem('bos_social_tab') as Tab | null; return t && TABS.some(([k]) => k === t) ? t : 'calendar'; } catch { return 'calendar'; } });
   const [accounts, setAccounts] = useState<Account[] | null>(null);
+  const [best, setBest] = useState<BestSlot[]>([]);
   const [compose, setCompose] = useState<{ initial?: Draft; time?: string } | null>(null);
   const [view, setView] = useState<Post | null>(null);
-  const [refresh, setRefresh] = useState(0); const [toast, setToast] = useState('');
+  const [refresh, setRefresh] = useState(0);
   const loadAccounts = useCallback(() => api<{ connected: Account[] }>(`/api/social/${business}/accounts`).then((r) => setAccounts(r.connected)).catch(() => setAccounts([])), [business]);
-  useEffect(() => { loadAccounts(); }, [loadAccounts]);
-  useEffect(() => { if (mounted) try { localStorage.setItem('bos_social_tab', tab); } catch { /* private mode */ } }, [tab, mounted]);
-  useEffect(() => { if (!toast) return; const t = setTimeout(() => setToast(''), 5000); return () => clearTimeout(t); }, [toast]);
-  // the legacy dashboard shows this page in an iframe: tell it our height
-  // (the content's own height: the page height would include the frame height and only ever grow)
+  useEffect(() => { loadAccounts(); api<{ analysis: { bestSlots: BestSlot[] } }>(`/api/social/${business}/analytics?days=90`).then((r) => setBest(r.analysis.bestSlots)).catch(() => {}); }, [loadAccounts, business]);
+  useEffect(() => { try { localStorage.setItem('bos_social_tab', tab); } catch { /* private mode */ } }, [tab]);
   useEffect(() => {
-    if (!mounted || window.parent === window || !root.current) return;
+    if (window.parent === window || !root.current) return;
     const el = root.current;
-    const send = () => window.parent.postMessage({ bosSocialHeight: el.offsetHeight + 16 }, location.origin);
+    const send = () => window.parent.postMessage({ bosSocialHeight: el.offsetHeight + 24 }, location.origin);
     const ro = new ResizeObserver(send); ro.observe(el); send();
     return () => ro.disconnect();
-  }, [mounted]);
+  }, []);
   const nextHour = () => { const d = new Date(); d.setMinutes(0, 0, 0); d.setHours(d.getHours() + 1); return d.toISOString(); };
-  const open = (p: Post) => (['draft', 'scheduled', 'failed'].includes(p.status) ? setCompose({ initial: p }) : setView(p)); // published/partial: view + retry
-  const done = (m: string) => { setCompose(null); setToast(m); setRefresh((x) => x + 1); };
+  const open = (p: Post) => (['draft', 'scheduled', 'failed'].includes(p.status) ? setCompose({ initial: p }) : setView(p));
+  const saved = () => { setCompose(null); setRefresh((x) => x + 1); };
+  const nets = [...new Set((accounts ?? []).map((a) => a.network))];
+  const followers = (accounts ?? []).reduce((s, a) => s + (a.followers || 0), 0);
 
-  if (!mounted) return <p className="muted text-sm">Load hocche…</p>;
   return (
-    <div ref={root} className="grid gap-3">
-      <section className="card flex flex-wrap items-center gap-3">
-        <div className="flex items-center gap-2">{(accounts ?? []).map((a) => <Avatar key={a.id} a={a} size={30} />)}{accounts && !accounts.length && <span className="muted text-sm">Kono account connect kora nai</span>}</div>
-        <nav className="flex flex-wrap gap-1">{TABS.map(([k, l]) => <button key={k} className={'btn' + (tab === k ? ' btn-primary' : '')} onClick={() => setTab(k)}>{l}</button>)}</nav>
-        <button className="btn btn-primary" style={{ marginLeft: 'auto' }} onClick={() => setCompose({ time: nextHour() })}>＋ Notun post</button>
-      </section>
-      {toast && <p className="card text-sm" style={{ borderColor: 'var(--accent)' }}>{toast}</p>}
-      {tab === 'calendar' && <Calendar business={business} refresh={refresh} onOpen={open} onNew={(day) => setCompose({ time: new Date(day + 'T20:00').toISOString() })} />}
-      {tab === 'analytics' && <Analytics business={business} refresh={refresh} />}
-      {tab === 'ideas' && <Suggestions business={business} onUse={(d) => setCompose({ initial: d, time: nextHour() })} />}
-      {tab === 'accounts' && <Accounts business={business} accounts={accounts ?? []} canAdmin={canAdmin} onChange={loadAccounts} />}
-      {compose && accounts && <Composer business={business} accounts={accounts} initial={compose.initial} defaultTime={compose.time} onClose={() => setCompose(null)} onSaved={done} />}
-      {view && <PostView p={view} onClose={() => setView(null)} onChanged={(m) => { setView(null); done(m); }} />}
+    <div ref={root} className="sm">
+      <header className="sm-card sm-head" style={{ padding: '14px 16px' }}>
+        <div className="stack" style={{ gap: 2 }}>
+          <h1>Social Media</h1>
+          <span className="row muted xs" style={{ gap: 6 }}>{accounts === null ? 'Load hocche…' : accounts.length ? <>{NETS.filter((n) => nets.includes(n)).map((n) => <NetLogo key={n} net={n} size={14} />)} {accounts.length} account · {compact(followers)} follower</> : 'Kono account connect kora nai'}</span>
+        </div>
+        <div className="sm-avstack">{(accounts ?? []).slice(0, 6).map((a) => <Avatar key={a.id} a={a} size={30} ring />)}</div>
+        <span className="grow" />
+        <button className="sm-btn primary" onClick={() => setCompose({ time: nextHour() })} style={{ height: 40, padding: '0 18px', fontSize: 14.5 }}><Icon name="plus" />Post banan</button>
+      </header>
+      <nav className="sm-seg" role="tablist" style={{ justifySelf: 'start' }}>
+        {TABS.map(([k, l, ic]) => <button key={k} type="button" role="tab" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}><Icon name={ic} size={15} />{l}</button>)}
+      </nav>
+      {accounts && !accounts.length && tab !== 'accounts' && (
+        <div className="sm-card tint row sm-fade"><Icon name="users" style={{ color: 'var(--accent)' }} /><span className="grow">Post korte ar analytics dekhte age Facebook, Instagram, YouTube ba TikTok connect korun.</span><button className="sm-btn primary sm" onClick={() => setTab('accounts')}>Account connect</button></div>
+      )}
+      <div key={tab} className="sm-fade">
+        {tab === 'calendar' && <Calendar business={business} refresh={refresh} nets={nets} onOpen={open} onNew={(day) => setCompose({ time: new Date(day + 'T20:00').toISOString() })} />}
+        {tab === 'analytics' && <Analytics business={business} refresh={refresh} />}
+        {tab === 'ideas' && <Suggestions business={business} onUse={(d) => setCompose({ initial: d, time: nextHour() })} />}
+        {tab === 'accounts' && <Accounts business={business} accounts={accounts ?? []} canAdmin={canAdmin} onChange={loadAccounts} />}
+      </div>
+      {compose && accounts && <Composer business={business} accounts={accounts} initial={compose.initial} defaultTime={compose.time} best={best} onClose={() => setCompose(null)} onSaved={saved} />}
+      {view && accounts && <PostView p={view} accounts={accounts} onClose={() => setView(null)} onChanged={() => { setView(null); saved(); }} toast={toast} />}
     </div>
   );
 }
 
-function PostView({ p, onClose, onChanged }: { p: Post; onClose: () => void; onChanged: (m: string) => void }) {
-  const box = useFrameDialog();
-  const [busy, setBusy] = useState(false); const [err, setErr] = useState('');
+function PostView({ p, accounts, onClose, onChanged, toast }: { p: Post; accounts: Account[]; onClose: () => void; onChanged: () => void; toast: ReturnType<typeof useToast> }) {
+  const [busy, setBusy] = useState(false);
   const [l, c] = STATUS[p.status] ?? [p.status, '#888'];
-  const retry = async () => { setBusy(true); try { const r = await api<{ status: string }>('/api/social/posts/' + p.id + '/publish', { method: 'POST' }); onChanged(r.status === 'published' ? 'Post hoye geche ✓' : 'Ekhono kichu jaygay hoyni'); } catch (e) { setErr((e as Error).message); setBusy(false); } };
-  const del = async () => { if (!confirm('Calendar theke muchben? (Facebook/Instagram e thaka post page theke nije muchte hobe)')) return; await api('/api/social/posts/' + p.id, { method: 'DELETE' }); onChanged('Muche fela hoyeche'); };
+  const retry = async () => { setBusy(true); try { const r = await api<{ status: string }>('/api/social/posts/' + p.id + '/publish', { method: 'POST' }); toast(r.status === 'published' ? 'Post hoye geche ✓' : 'Ekhono kichu jaygay hoyni', r.status === 'published' ? 'ok' : 'err'); onChanged(); } catch (e) { toast((e as Error).message, 'err'); setBusy(false); } };
+  const del = async () => { if (!confirm('Calendar theke muchben? (Platform e thaka post okhan theke nije muchte hobe)')) return; try { await api('/api/social/posts/' + p.id, { method: 'DELETE' }); toast('Muche fela hoyeche'); onChanged(); } catch (e) { toast((e as Error).message, 'err'); } };
+  const first = accounts.find((a) => a.id === p.targets[0]?.account_id);
   return (
-    <div role="dialog" aria-modal="true" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.45)', zIndex: 50, display: 'flex', justifyContent: 'center', alignItems: 'flex-start', padding: 24, overflowY: 'auto' }} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div ref={box} className="card grid gap-3" style={{ maxWidth: 560, width: '100%' }}>
-        <div className="flex items-center justify-between"><b style={{ color: c }}>{l}</b><button className="btn" onClick={onClose}>✕</button></div>
-        <span className="muted text-sm">{p.published_at ? 'Publish: ' + dateLabel(p.published_at) : p.scheduled_at ? 'Schedule: ' + dateLabel(p.scheduled_at) : ''}{p.created_by ? ' · ' + p.created_by : ''}</span>
-        {p.media[0] && (p.media[0].mime.startsWith('video/') ? <video src={p.media[0].url} controls style={{ width: '100%', borderRadius: 8 }} /> : <img src={p.media[0].url} alt="" style={{ width: '100%', borderRadius: 8 }} />)}
-        <p className="text-sm" style={{ whiteSpace: 'pre-wrap' }}>{p.text}</p>
-        <div className="grid gap-1">{p.targets.map((t) => <div key={t.account_id} className="flex flex-wrap items-center gap-2 text-sm"><NetIcon net={t.network} /> {t.name} · <b style={{ color: (STATUS[t.status === 'published' ? 'published' : t.status === 'failed' ? 'failed' : 'scheduled'] ?? ['', '#888'])[1] }}>{t.status}</b>{t.permalink && <a className="link" href={t.permalink} target="_blank" rel="noreferrer">dekhun ↗</a>}{t.error && <span style={{ color: '#d64545' }}>{t.error}</span>}</div>)}</div>
-        {err && <p className="text-sm" style={{ color: '#d64545' }}>{err}</p>}
-        <div className="flex gap-2">{p.targets.some((t) => t.status !== 'published') && <button className="btn btn-primary" disabled={busy} onClick={retry}>Abar chesta korun</button>}<button className="btn" onClick={del}>Calendar theke muchun</button></div>
+    <Modal onClose={onClose} width={760}>
+      <div className="sm-grid sm-g2" style={{ padding: 20, gap: 18 }}>
+        <div className="stack">
+          <span className="row"><span className="sm-dot" style={{ background: c }} /><b style={{ color: c }}>{l}</b></span>
+          <span className="muted xs">{p.published_at ? 'Post: ' + dateLabel(p.published_at) : p.scheduled_at ? 'Schedule: ' + dateLabel(p.scheduled_at) : ''}{p.created_by ? ' · ' + p.created_by : ''}</span>
+          <div className="stack" style={{ gap: 6 }}>{p.targets.map((t) => (
+            <div key={t.account_id} className="sm-acc" style={{ display: 'grid', gap: 3 }}>
+              <span className="row"><NetLogo net={t.network} size={18} /><b>{t.name || NET_NAME[t.network]}</b><span className="grow" /><span className="xs" style={{ fontWeight: 700, color: t.status === 'published' ? 'var(--good)' : t.status === 'failed' ? 'var(--bad)' : 'var(--muted)' }}>{t.status === 'published' ? 'Hoyeche' : t.status === 'failed' ? 'Hoyni' : 'Baki'}</span>{t.permalink && <a className="lnk xs" href={t.permalink} target="_blank" rel="noreferrer">dekhun ↗</a>}</span>
+              {t.note && <span className="xs" style={{ color: 'var(--warn)' }}>{t.note}</span>}
+              {t.error && <span className="xs" style={{ color: 'var(--bad)' }}>{t.error}</span>}
+            </div>))}
+          </div>
+          <div className="row">{p.targets.some((t) => t.status !== 'published') && <button className="sm-btn primary" disabled={busy} onClick={retry}>{busy ? <span className="sm-spin" /> : <Icon name="refresh" size={14} />}Abar chesta korun</button>}<button className="sm-btn ghost danger" onClick={del}><Icon name="trash" size={14} />Calendar theke muchun</button></div>
+        </div>
+        <div>{first ? <PostPreview a={first} text={p.targets[0]?.text ?? p.text} media={p.media} link={p.link} title={p.options?.yt_title} /> : <p className="sm-t" style={{ whiteSpace: 'pre-wrap' }}>{p.text}</p>}</div>
       </div>
-    </div>
+    </Modal>
   );
 }

@@ -86,3 +86,48 @@ describe('publishing (mocked Meta)', () => {
     await expect(publishInstagram('IG1', 'PAGE4', { text: 'only text', media: [] }, 'USER', g.f)).rejects.toThrow(/chobi ba video/);
   });
 });
+
+describe('YouTube + TikTok (mocked)', async () => {
+  const { mkdtemp, writeFile } = await import('node:fs/promises');
+  const { tmpdir } = await import('node:os');
+  const path = (await import('node:path')).default;
+  const { publishYouTube } = await import('@/lib/social/youtube');
+  const { publishTikTok, chunks } = await import('@/lib/social/tiktok');
+  const dir = await mkdtemp(path.join(tmpdir(), 'bos-'));
+  const file = path.join(dir, 'v.mp4'); await writeFile(file, Buffer.alloc(1234, 7));
+  const vid = { path: file, size: 1234, mime: 'video/mp4' };
+
+  it('TikTok chunks: one chunk under the size, else 10 MB chunks with the rest in the last', () => {
+    expect(chunks(3_000_000)).toEqual({ chunk_size: 3_000_000, total_chunk_count: 1 });
+    expect(chunks(25 * 1024 * 1024)).toEqual({ chunk_size: 10 * 1024 * 1024, total_chunk_count: 2 });
+  });
+  it('YouTube: resumable upload with title from the first line, public, not made for kids', async () => {
+    const calls: { url: string; init?: RequestInit }[] = [];
+    const f = (async (url: string, init?: RequestInit) => {
+      calls.push({ url: String(url), init });
+      if (String(url).includes('uploadType=resumable')) return new Response('', { status: 200, headers: { location: 'https://upload.example/session1' } });
+      return new Response(JSON.stringify({ id: 'vid123', status: { privacyStatus: 'private' } }), { status: 200 });
+    }) as typeof fetch;
+    const r = await publishYouTube(vid, 'Cerelac banano\nDetails…', {}, 'TOKEN', f);
+    expect(r).toMatchObject({ ext_post_id: 'vid123', permalink: 'https://youtu.be/vid123' });
+    expect(r.note).toMatch(/private/); // Google keeps unaudited API uploads private: say so
+    const meta = JSON.parse(String(calls[0].init!.body));
+    expect(meta).toMatchObject({ snippet: { title: 'Cerelac banano' }, status: { privacyStatus: 'public', selfDeclaredMadeForKids: false } });
+    expect(calls[1]).toMatchObject({ url: 'https://upload.example/session1' });
+  });
+  it('TikTok inbox: init, upload the bytes, wait for SEND_TO_USER_INBOX', async () => {
+    const seen: string[] = []; let put: RequestInit | undefined;
+    const f = (async (url: string, init?: RequestInit) => {
+      const u = String(url); seen.push(u.replace('https://open.tiktokapis.com/v2', ''));
+      const ok = (data: unknown) => new Response(JSON.stringify({ data, error: { code: 'ok' } }), { status: 200 });
+      if (u.includes('/inbox/video/init/')) return ok({ publish_id: 'p1', upload_url: 'https://up.tiktok/x' });
+      if (u === 'https://up.tiktok/x') { put = init; return new Response('', { status: 201 }); }
+      if (u.includes('/status/fetch/')) return ok({ status: 'SEND_TO_USER_INBOX' });
+      return ok({});
+    }) as typeof fetch;
+    const r = await publishTikTok(vid, 'Hi', { mode: 'inbox' }, 'TOKEN', f);
+    expect(seen).toEqual(['/post/publish/inbox/video/init/', 'https://up.tiktok/x', '/post/publish/status/fetch/']);
+    expect((put!.headers as Record<string, string>)['content-range']).toBe('bytes 0-1233/1234');
+    expect(r.note).toMatch(/TikTok app/);
+  });
+});

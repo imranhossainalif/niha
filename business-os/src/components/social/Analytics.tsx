@@ -1,156 +1,175 @@
 'use client';
-// What worked: totals vs the period before, followers, best time (weekday × hour), format, content type, top and weak posts.
-import { useEffect, useState } from 'react';
-import { api, FORMAT_LABEL, NetIcon, nf, pct, Tile, TYPE_LABEL, WEEKDAYS } from './ui';
+// What worked: KPIs vs the period before (with small daily charts), best time heatmap, by hour, format, content type,
+// network split, top and weak posts, followers, Instagram audience. All times Bangladesh.
+import { useEffect, useRef, useState } from 'react';
+import { Icon, NET_COLOR, NET_NAME, NetLogo, NETS, type Net } from './icons';
+import { api, compact, Empty, FORMAT_LABEL, Kpi, nf, pct, Seg, Skel, TYPE_LABEL, useToast, WEEKDAYS } from './ui';
 
 type Agg = { key: string; posts: number; engagement: number; reach: number; avg_eng: number; avg_reach: number; rate: number | null };
-type PostRow = { network: string; ext_id: string; created: string; text?: string; permalink?: string; thumb?: string; format: string; content_type?: string; eng: number; rate: number | null; metrics: Record<string, number | undefined> };
+type PostRow = { network: Net; ext_id: string; created: string; text?: string; permalink?: string; thumb?: string; format: string; content_type?: string; eng: number; rate: number | null; metrics: Record<string, number | undefined> };
+type Day = { date: string; posts: number; engagement: number; reach: number; views: number };
 type Data = {
-  days: number; total_posts: number; synced: string | null;
-  analysis: { totals: { posts: number; engagement: number; reach: number; views: number }; byHour: Agg[]; byWeekday: Agg[]; byFormat: Agg[]; byType: Agg[]; heat: (Agg & { weekday: number; hour: number })[]; bestHours: Agg[]; bestDays: Agg[]; bestSlots: (Agg & { weekday: number; hour: number })[]; bestFormat: Agg | null; top: PostRow[]; weak: PostRow[] };
+  days: number; total_posts: number; synced: string | null; series: Day[]; networks: Net[];
+  analysis: { totals: { posts: number; engagement: number; reach: number; views: number }; byHour: Agg[]; byWeekday: Agg[]; byFormat: Agg[]; byType: Agg[]; byNetwork: Agg[]; heat: (Agg & { weekday: number; hour: number })[]; bestHours: Agg[]; bestDays: Agg[]; bestSlots: (Agg & { weekday: number; hour: number })[]; bestFormat: Agg | null; top: PostRow[]; weak: PostRow[] };
   prev: { posts: number; engagement: number; reach: number; views: number };
-  followers: { account_doc: string; network: string; date: string; followers: number }[];
+  followers: { account_doc: string; network: Net; date: string; followers: number }[];
   audience: { account_doc: string; age_gender: { key: string; value: number }[]; city: { key: string; value: number }[] }[];
 };
+const slot = (h: number) => String(h).padStart(2, '0') + '–' + String(h + 3).padStart(2, '0');
 
-function Bars({ rows, label, value }: { rows: { k: string; v: number; n: number }[]; label: (k: string) => string; value: (v: number) => string }) {
-  const max = Math.max(1, ...rows.map((r) => r.v));
+function Spark({ values, color = 'var(--accent)' }: { values: number[]; color?: string }) {
+  const max = Math.max(1, ...values); const W = 120, H = 28;
+  return <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} preserveAspectRatio="none" aria-hidden="true">{values.map((v, i) => { const w = W / values.length; const h = Math.max(1.5, (v / max) * H); return <rect key={i} x={i * w + 0.5} y={H - h} width={Math.max(1, w - 1.5)} height={h} rx={1} fill={color} opacity={v ? 0.85 : 0.18} />; })}</svg>;
+}
+
+function HourChart({ rows, best }: { rows: Agg[]; best: Set<string> }) {
+  const by = new Map(rows.map((r) => [Number(r.key), r]));
+  const max = Math.max(1, ...rows.map((r) => r.avg_eng)); const W = 600, H = 170;
+  const [tip, setTip] = useState<{ x: number; t: string } | null>(null);
   return (
-    <div className="grid gap-1">
-      {rows.map((r) => (
-        <div key={r.k} className="grid items-center gap-2 text-sm" style={{ gridTemplateColumns: '120px 1fr 90px' }}>
-          <span>{label(r.k)}</span>
-          <div style={{ height: 10, background: 'var(--line)', borderRadius: 5 }}><div style={{ height: 10, width: (r.v / max) * 100 + '%', background: 'var(--accent)', borderRadius: 5 }} /></div>
-          <span className="text-right">{value(r.v)} <span className="muted text-xs">({r.n})</span></span>
-        </div>
-      ))}
+    <div style={{ position: 'relative' }}>
+      <svg viewBox={`0 0 ${W} ${H + 22}`} width="100%" role="img" aria-label="Ghonta onujayi engagement">
+        {[0.25, 0.5, 0.75, 1].map((g) => <line key={g} x1={0} x2={W} y1={H - g * H} y2={H - g * H} stroke="var(--line)" strokeDasharray="3 4" />)}
+        {Array.from({ length: 24 }, (_, h) => { const r = by.get(h); const bw = W / 24; const bh = r ? Math.max(3, (r.avg_eng / max) * (H - 6)) : 0;
+          return <g key={h} onMouseEnter={() => r && setTip({ x: (h + 0.5) * bw, t: String(h).padStart(2, '0') + ':00 · gor ' + nf(r.avg_eng, 1) + ' · ' + r.posts + ' post' })} onMouseLeave={() => setTip(null)}>
+            <rect x={h * bw} y={0} width={bw} height={H} fill="transparent" />
+            {r && <rect x={h * bw + 3} y={H - bh} width={bw - 6} height={bh} rx={4} fill={best.has(String(h)) ? 'var(--accent)' : 'color-mix(in srgb, var(--accent) 35%, transparent)'} style={{ transition: 'height .4s' }} />}
+            {h % 3 === 0 && <text x={h * bw + bw / 2} y={H + 16} textAnchor="middle" fontSize="11" fill="currentColor" opacity=".55">{String(h).padStart(2, '0')}</text>}
+          </g>; })}
+      </svg>
+      {tip && <div className="sm-badge" style={{ position: 'absolute', top: 0, left: `calc(${(tip.x / W) * 100}% - 70px)`, background: 'var(--fg)', color: 'var(--panel)', pointerEvents: 'none' }}>{tip.t}</div>}
     </div>
   );
 }
 
-function FollowerChart({ rows }: { rows: { date: string; followers: number; network: string }[] }) {
+function Followers({ rows }: { rows: Data['followers'] }) {
   const nets = [...new Set(rows.map((r) => r.network))];
-  if (rows.length < 2) return <p className="muted text-sm">Follower er hishab protidin jomche — kichu din por graph dekhabe.</p>;
-  const W = 600, H = 140;
+  if (!nets.some((n) => rows.filter((r) => r.network === n).length >= 2)) return <p className="muted sm-t">Follower er hishab protidin jomche — kichu din por graph dekhabe.</p>;
+  const W = 600, H = 150;
   return (
-    <svg viewBox={`0 0 ${W} ${H + 20}`} width="100%" role="img" aria-label="Follower">
-      {nets.map((n) => {
-        const rs = rows.filter((r) => r.network === n); if (rs.length < 2) return null;
-        const min = Math.min(...rs.map((r) => r.followers)), max = Math.max(...rs.map((r) => r.followers)) || 1;
-        const x = (i: number) => (i / (rs.length - 1)) * (W - 20) + 10, y = (v: number) => H - ((v - min) / Math.max(1, max - min)) * (H - 20) - 10;
-        return <g key={n}><polyline fill="none" stroke={n === 'instagram' ? '#d6249f' : '#1877F2'} strokeWidth={2.5} points={rs.map((r, i) => x(i) + ',' + y(r.followers)).join(' ')} />
-          <text x={W - 10} y={y(rs[rs.length - 1].followers) - 6} textAnchor="end" fontSize="12" fill="currentColor">{nf(rs[rs.length - 1].followers)}</text></g>;
-      })}
-      <text x={10} y={H + 16} fontSize="11" fill="currentColor" opacity=".6">{rows[0].date}</text>
-      <text x={W - 10} y={H + 16} fontSize="11" textAnchor="end" fill="currentColor" opacity=".6">{rows[rows.length - 1].date}</text>
-    </svg>
+    <div className="stack">
+      <div className="row">{nets.map((n) => { const rs = rows.filter((r) => r.network === n); const d = rs.length > 1 ? rs[rs.length - 1].followers - rs[0].followers : 0; return <span key={n} className="row sm-t" style={{ gap: 6 }}><NetLogo net={n} size={16} /><b>{compact(rs[rs.length - 1]?.followers)}</b><span className={'sm-delta ' + (d >= 0 ? 'up' : 'down')}>{d >= 0 ? '+' : ''}{nf(d)}</span></span>; })}</div>
+      <svg viewBox={`0 0 ${W} ${H}`} width="100%" role="img" aria-label="Follower">
+        <defs>{nets.map((n) => <linearGradient key={n} id={'fg-' + n} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={NET_COLOR[n]} stopOpacity=".22" /><stop offset="1" stopColor={NET_COLOR[n]} stopOpacity="0" /></linearGradient>)}</defs>
+        {nets.map((n) => {
+          const rs = rows.filter((r) => r.network === n); if (rs.length < 2) return null;
+          const min = Math.min(...rs.map((r) => r.followers)), max = Math.max(...rs.map((r) => r.followers));
+          const x = (i: number) => (i / (rs.length - 1)) * W, y = (v: number) => H - 8 - ((v - min) / Math.max(1, max - min)) * (H - 24);
+          const line = rs.map((r, i) => (i ? 'L' : 'M') + x(i).toFixed(1) + ',' + y(r.followers).toFixed(1)).join(' ');
+          return <g key={n}><path d={line + ` L${W},${H} L0,${H} Z`} fill={`url(#fg-${n})`} /><path d={line} fill="none" stroke={NET_COLOR[n]} strokeWidth={2.5} strokeLinejoin="round" /></g>;
+        })}
+      </svg>
+      <div className="row muted xs"><span>{rows[0]?.date}</span><span className="grow" /><span>{rows[rows.length - 1]?.date}</span></div>
+    </div>
   );
 }
 
 export function Analytics({ business, refresh }: { business: string; refresh: number }) {
-  const [days, setDays] = useState(30); const [net, setNet] = useState('');
-  const [d, setD] = useState<Data | null>(null); const [err, setErr] = useState(''); const [msg, setMsg] = useState('');
-  useEffect(() => { setD(null); api<Data>(`/api/social/${business}/analytics?days=${days}&network=${net}`).then(setD).catch((e) => setErr(e.message)); }, [business, days, net, refresh]);
-  const sync = async () => { setMsg('…'); try { const r = await api<{ queued: boolean; note?: string }>(`/api/social/${business}/research`, { method: 'POST', json: { action: 'sync' } }); setMsg(r.queued ? 'Facebook/Instagram theke notun data ana hocche — 2-5 min por refresh korun.' : r.note || ''); } catch (e) { setMsg((e as Error).message); } };
-  if (err) return <p className="card text-sm" style={{ color: '#d64545' }}>{err}</p>;
-  if (!d) return <p className="card muted text-sm">Load hocche…</p>;
+  const toast = useToast();
+  const [days, setDays] = useState('30'); const [net, setNet] = useState<'' | Net>('');
+  const [d, setD] = useState<Data | null>(null); const [loading, setLoading] = useState(false); const [syncing, setSyncing] = useState(false);
+  const seq = useRef(0);
+  useEffect(() => { const my = ++seq.current; setLoading(true); api<Data>(`/api/social/${business}/analytics?days=${days}&network=${net}`).then((x) => my === seq.current && setD(x)).catch((e) => toast(e.message, 'err')).finally(() => my === seq.current && setLoading(false)); }, [business, days, net, refresh]);
+  const sync = async () => { setSyncing(true); try { const r = await api<{ queued: boolean; note?: string }>(`/api/social/${business}/research`, { method: 'POST', json: { action: 'sync' } }); toast(r.queued ? 'Notun data ana hocche — 2-5 min por refresh korun' : r.note || 'Age theke cholche'); } catch (e) { toast((e as Error).message, 'err'); } setSyncing(false); };
+
+  if (!d) return <div className="stack"><div className="sm-grid sm-g4">{[0, 1, 2, 3].map((i) => <div key={i} className="sm-card stack"><Skel h={12} w={90} /><Skel h={28} w={110} /><Skel h={28} /></div>)}</div><div className="sm-card"><Skel h={220} /></div></div>;
   const A = d.analysis, T = A.totals;
-  const lastF = (n: string) => { const r = d.followers.filter((x) => x.network === n); return r.length ? [r[0].followers, r[r.length - 1].followers] : null; };
+  const s = d.series;
   const heatMax = Math.max(1, ...A.heat.map((h) => h.avg_eng));
   const heatAt = (w: number, h: number) => A.heat.find((x) => x.weekday === w && x.hour === h);
-  const slotLabel = (h: number) => String(h).padStart(2, '0') + '–' + String(h + 3).padStart(2, '0');
-  const fact = (s: string) => <><b>FACT:</b> {s}</>;
+  const bestH = new Set(A.bestHours.map((x) => x.key));
+  const hasViews = T.views > 0;
+  const reachD = pct(T.reach + T.views, d.prev.reach + d.prev.views);
 
   return (
-    <div className="grid gap-3">
-      <section className="card flex flex-wrap items-center gap-2">
-        <select className="input" style={{ width: 'auto' }} value={days} onChange={(e) => setDays(Number(e.target.value))}>{[7, 30, 90, 180, 365].map((n) => <option key={n} value={n}>Shesh {n} din</option>)}</select>
-        <select className="input" style={{ width: 'auto' }} value={net} onChange={(e) => setNet(e.target.value)}><option value="">Facebook + Instagram</option><option value="facebook">Facebook</option><option value="instagram">Instagram</option></select>
-        <span className="muted text-xs">Data update: {d.synced ? new Date(d.synced).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'ekhono hoyni'} · proti 3 ghonta</span>
-        <button className="btn" style={{ marginLeft: 'auto' }} onClick={sync}>↻ Ekhon data anun</button>
-        {msg && <span className="text-sm">{msg}</span>}
-      </section>
-      {!d.total_posts ? <p className="card text-sm">Ekhono kono post er data nai. Accounts connect korar por "Ekhon data anun" chapun — shesh 90 diner post, reach, like, comment, share chole ashbe.</p> : (<>
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-          <Tile label="Post" value={nf(T.posts)} delta={pct(T.posts, d.prev.posts)} note={'ager ' + d.days + ' din: ' + nf(d.prev.posts)} />
-          <Tile label="Reach (koto jon dekhse)" value={nf(T.reach)} delta={pct(T.reach, d.prev.reach)} note={T.posts ? 'gor ' + nf(T.reach / T.posts) + ' / post' : ''} />
-          <Tile label="Engagement" value={nf(T.engagement)} delta={pct(T.engagement, d.prev.engagement)} note="react + comment + share + save" />
-          <Tile label="Gor engagement / post" value={nf(T.posts ? T.engagement / T.posts : 0, 1)} note={T.reach ? 'reach er ' + nf((T.engagement / T.reach) * 100, 1) + '%' : ''} />
-          <Tile label="Follower" value={['facebook', 'instagram'].map((n) => lastF(n)).filter(Boolean).map((x) => nf(x![1])).join(' / ') || '—'} note={['facebook', 'instagram'].map((n) => { const x = lastF(n); return x ? (n === 'facebook' ? 'FB ' : 'IG ') + (x[1] - x[0] >= 0 ? '+' : '') + nf(x[1] - x[0]) : null; }).filter(Boolean).join(' · ') || 'jomche'} />
+    <div className="stack" style={{ gap: 14 }}>
+      <div className="sm-card row" style={{ padding: 12 }}>
+        <Seg value={days} onChange={setDays} small items={[['7', '7 din'], ['30', '30 din'], ['90', '90 din'], ['365', '1 bochor']]} />
+        <div className="row" style={{ gap: 6 }}>
+          <button type="button" className="sm-chip plain" aria-pressed={!net} onClick={() => setNet('')}>Shob</button>
+          {NETS.filter((n) => d.networks.includes(n)).map((n) => <button key={n} type="button" className="sm-chip" aria-pressed={net === n} onClick={() => setNet(net === n ? '' : n)}><NetLogo net={n} size={18} />{NET_NAME[n]}</button>)}
         </div>
-        <section className="card grid gap-2" style={{ background: 'color-mix(in srgb, var(--accent) 7%, transparent)' }}>
-          <h3 className="font-semibold">Kokhon, ki post korle bhalo hoy (amader nijer data)</h3>
-          <ul className="grid gap-1 text-sm" style={{ paddingLeft: 18, listStyle: 'disc' }}>
-            {A.bestSlots.length ? <li>{fact('Shobcheye bhalo shomoy: ' + A.bestSlots.map((s) => WEEKDAYS[s.weekday] + ' ' + slotLabel(s.hour) + 'ta (gor ' + nf(s.avg_eng) + ', ' + s.posts + ' post)').join(' · '))}</li> : <li>Bhalo shomoy bolar moto data ekhono kom (ek ek slot e 2+ post lagbe).</li>}
-            {A.bestDays.length > 0 && <li>{fact('Bhalo din: ' + A.bestDays.map((x) => WEEKDAYS[Number(x.key)] + ' (gor ' + nf(x.avg_eng) + ')').join(', '))}</li>}
-            {A.bestFormat && <li>{fact('Bhalo format: ' + (FORMAT_LABEL[A.bestFormat.key] || A.bestFormat.key) + ' — gor ' + nf(A.bestFormat.avg_eng) + ' engagement (' + A.bestFormat.posts + ' post)')}</li>}
-            {A.byType[0] && <li>{fact('Bhalo dhoron: ' + (TYPE_LABEL[A.byType[0].key] || A.byType[0].key) + ' — gor ' + nf(A.byType[0].avg_eng))}</li>}
-          </ul>
-          <p className="muted text-xs">Shomoy Bangladesh time. Ek-dui ta post diye shiddhanto na — post jotto barbe, hishab totto pakka hobe.</p>
+        <span className="grow" />
+        <span className="muted xs">Data: {d.synced ? new Date(d.synced).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'ekhono ashe nai'} · proti 3 ghonta</span>
+        <button className="sm-btn sm" onClick={sync} disabled={syncing}>{syncing ? <span className="sm-spin" /> : <Icon name="refresh" size={14} />}Ekhon data anun</button>
+      </div>
+      <div className="sm-loadbar" style={{ visibility: loading ? 'visible' : 'hidden', marginTop: -10 }} />
+
+      {!d.total_posts ? <Empty icon="chart" title="Ekhono post er data nai">Account connect korar por "Ekhon data anun" chapun — shesh 90 diner post, reach, view, like, comment, share chole ashbe.</Empty> : (<>
+        <div className="sm-grid sm-g4">
+          <div className="stack" style={{ gap: 0 }}><Kpi icon="edit" label="Post" value={nf(T.posts)} delta={pct(T.posts, d.prev.posts)} note={'ager ' + d.days + ' din: ' + nf(d.prev.posts)} /></div>
+          <div className="sm-card sm-kpi sm-fade"><span className="row muted xs" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}><Icon name="eye" size={14} />{hasViews ? 'Reach + video view' : 'Reach'}</span><span className="row"><span className="v">{compact(T.reach + T.views)}</span>{reachD != null && <span className={'sm-delta ' + (reachD >= 0 ? 'up' : 'down')}>{reachD}%</span>}</span><Spark values={s.map((x) => x.reach + x.views)} color="var(--info)" /></div>
+          <div className="sm-card sm-kpi sm-fade"><span className="row muted xs" style={{ fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em' }}><Icon name="heart" size={14} />Engagement</span><span className="row"><span className="v">{compact(T.engagement)}</span>{pct(T.engagement, d.prev.engagement) != null && <span className={'sm-delta ' + ((pct(T.engagement, d.prev.engagement) ?? 0) >= 0 ? 'up' : 'down')}>{pct(T.engagement, d.prev.engagement)}%</span>}</span><Spark values={s.map((x) => x.engagement)} /></div>
+          <Kpi icon="spark" label="Gor engagement / post" value={nf(T.posts ? T.engagement / T.posts : 0, 1)} note={T.reach ? 'reach er ' + nf((T.engagement / T.reach) * 100, 1) + '% react/comment korse' : 'react + comment + share + save'} />
+        </div>
+
+        <section className="sm-card tint stack">
+          <span className="row"><Icon name="spark" style={{ color: 'var(--accent)' }} /><h3>Kokhon, ki post korle bhalo hoy</h3><span className="sm-badge" style={{ background: 'color-mix(in srgb, var(--good) 14%, transparent)', color: 'var(--good)' }}>FACT · nijer data</span></span>
+          <div className="sm-grid sm-g3">
+            <div className="stack" style={{ gap: 4 }}><span className="muted xs" style={{ fontWeight: 700 }}>SHOBCHEYE BHALO SHOMOY</span>{A.bestSlots.length ? A.bestSlots.map((x) => <span key={x.key} className="row"><b>{WEEKDAYS[x.weekday]} {slot(x.hour)}ta</b><span className="muted xs">gor {nf(x.avg_eng)} · {x.posts} post</span></span>) : <span className="muted sm-t">Ek ek shomoye 2+ post hole bolbo.</span>}</div>
+            <div className="stack" style={{ gap: 4 }}><span className="muted xs" style={{ fontWeight: 700 }}>BHALO FORMAT</span>{A.byFormat.filter((x) => x.posts >= 2).slice(0, 3).map((x, i) => <span key={x.key} className="row"><b>{i === 0 ? '🏆 ' : ''}{FORMAT_LABEL[x.key] || x.key}</b><span className="muted xs">gor {nf(x.avg_eng)} · {x.posts} post</span></span>)}</div>
+            <div className="stack" style={{ gap: 4 }}><span className="muted xs" style={{ fontWeight: 700 }}>BHALO DHORON</span>{A.byType.length ? A.byType.filter((x) => x.posts >= 2).slice(0, 3).map((x, i) => <span key={x.key} className="row"><b>{i === 0 ? '🏆 ' : ''}{TYPE_LABEL[x.key] || x.key}</b><span className="muted xs">gor {nf(x.avg_eng)} · {x.posts} post</span></span>) : <span className="muted sm-t">"Ideas" e analyze korle AI post er dhoron chinbe.</span>}</div>
+          </div>
         </section>
-        <div className="grid gap-3 lg:grid-cols-2">
-          <section className="card grid gap-2">
-            <h3 className="font-semibold">Best time heatmap</h3>
-            <p className="muted text-xs">Ghor er rong = oi din-shomoyer post er gor engagement (gaar = beshi). Sonkha = koyta post.</p>
-            <div style={{ overflowX: 'auto' }}>
-              <table style={{ borderCollapse: 'separate', borderSpacing: 3, fontSize: 12 }}>
-                <thead><tr><th />{[0, 3, 6, 9, 12, 15, 18, 21].map((h) => <th key={h} className="muted" style={{ fontWeight: 500 }}>{slotLabel(h)}</th>)}</tr></thead>
+
+        <div className="sm-grid sm-g2">
+          <section className="sm-card stack">
+            <h3>Best time heatmap</h3><span className="muted xs">Gaar rong = oi din-shomoye post er gor engagement beshi · sonkha = koyta post</span>
+            <div className="sm-scroll-x">
+              <table className="sm-heat" style={{ borderCollapse: 'separate', borderSpacing: 4 }}>
+                <thead><tr><th />{[0, 3, 6, 9, 12, 15, 18, 21].map((h) => <th key={h} className="muted xs" style={{ fontWeight: 600 }}>{slot(h)}</th>)}</tr></thead>
                 <tbody>{[6, 0, 1, 2, 3, 4, 5].map((w) => (
-                  <tr key={w}><th className="muted" style={{ textAlign: 'left', fontWeight: 500, paddingRight: 6 }}>{WEEKDAYS[w]}</th>
-                    {[0, 3, 6, 9, 12, 15, 18, 21].map((h) => { const c = heatAt(w, h); return <td key={h} title={c ? nf(c.avg_eng, 1) + ' gor · ' + c.posts + ' post' : 'post nai'} style={{ width: 46, height: 30, textAlign: 'center', borderRadius: 6, background: c ? `color-mix(in srgb, var(--accent) ${15 + (c.avg_eng / heatMax) * 85}%, transparent)` : 'color-mix(in srgb, var(--line) 50%, transparent)', color: c && c.avg_eng / heatMax > 0.55 ? '#fff' : undefined }}>{c ? c.posts : ''}</td>; })}
+                  <tr key={w}><th className="muted xs" style={{ textAlign: 'left', fontWeight: 600, paddingRight: 6 }}>{WEEKDAYS[w]}</th>
+                    {[0, 3, 6, 9, 12, 15, 18, 21].map((h) => { const c = heatAt(w, h); const k = c ? c.avg_eng / heatMax : 0; return <td key={h} title={c ? WEEKDAYS[w] + ' ' + slot(h) + ' · gor ' + nf(c.avg_eng, 1) + ' · ' + c.posts + ' post' : 'post nai'} style={{ background: c ? `color-mix(in srgb, var(--accent) ${12 + k * 88}%, transparent)` : 'color-mix(in srgb, var(--soft) 80%, transparent)', color: k > 0.55 ? '#fff' : 'var(--muted)' }}>{c ? c.posts : ''}</td>; })}
                   </tr>))}
                 </tbody>
               </table>
             </div>
+            <div className="row muted xs">Kom<span style={{ width: 120, height: 8, borderRadius: 4, background: 'linear-gradient(90deg, color-mix(in srgb, var(--accent) 12%, transparent), var(--accent))' }} />Beshi</div>
           </section>
-          <section className="card grid gap-2">
-            <h3 className="font-semibold">Kon ghontay post korle koto engagement</h3>
-            <Bars rows={A.byHour.map((x) => ({ k: x.key, v: x.avg_eng, n: x.posts }))} label={(k) => String(k).padStart(2, '0') + ':00'} value={(v) => nf(v, 1)} />
+          <section className="sm-card stack"><h3>Kon ghontay post korle koto engagement</h3><span className="muted xs">Gaar bar = shobcheye bhalo ghonta · mouse rakhle details</span><HourChart rows={A.byHour} best={bestH} /></section>
+          <section className="sm-card stack"><h3>Format</h3>
+            {A.byFormat.map((x) => { const m = Math.max(1, ...A.byFormat.map((y) => y.avg_eng)); return <div key={x.key} className="sm-hbar"><span className="row" style={{ gap: 6 }}><b>{FORMAT_LABEL[x.key] || x.key}</b><span className="muted xs">{x.posts}</span></span><div className="track"><div className="fill" style={{ width: (x.avg_eng / m) * 100 + '%' }} /></div><span className="xs"><b>{nf(x.avg_eng, 1)}</b>{x.rate != null && <span className="muted"> · {nf(x.rate, 1)}%</span>}</span></div>; })}
           </section>
-          <section className="card grid gap-2">
-            <h3 className="font-semibold">Format: chobi / video / reel / carousel</h3>
-            <table className="t text-sm"><thead><tr><th>Format</th><th>Post</th><th>Gor engagement</th><th>Gor reach</th><th>Engagement %</th></tr></thead>
-              <tbody>{A.byFormat.map((x) => <tr key={x.key}><td>{FORMAT_LABEL[x.key] || x.key}</td><td>{x.posts}</td><td><b>{nf(x.avg_eng, 1)}</b></td><td>{nf(x.avg_reach)}</td><td>{x.rate == null ? '—' : nf(x.rate, 1) + '%'}</td></tr>)}</tbody></table>
-          </section>
-          <section className="card grid gap-2">
-            <h3 className="font-semibold">Post er dhoron (product, offer, tips, review…)</h3>
-            {A.byType.length ? <table className="t text-sm"><thead><tr><th>Dhoron</th><th>Post</th><th>Gor engagement</th><th>Gor reach</th></tr></thead>
-              <tbody>{A.byType.map((x) => <tr key={x.key}><td>{TYPE_LABEL[x.key] || x.key}</td><td>{x.posts}</td><td><b>{nf(x.avg_eng, 1)}</b></td><td>{nf(x.avg_reach)}</td></tr>)}</tbody></table>
-              : <p className="muted text-sm">AI protita post er dhoron chinbe "Suggestions" tab e analyze korle.</p>}
+          <section className="sm-card stack"><h3>Post er dhoron</h3>
+            {A.byType.length ? A.byType.map((x) => { const m = Math.max(1, ...A.byType.map((y) => y.avg_eng)); return <div key={x.key} className="sm-hbar"><span className="row" style={{ gap: 6 }}><b>{TYPE_LABEL[x.key] || x.key}</b><span className="muted xs">{x.posts}</span></span><div className="track"><div className="fill" style={{ width: (x.avg_eng / m) * 100 + '%', background: 'var(--info)' }} /></div><span className="xs"><b>{nf(x.avg_eng, 1)}</b></span></div>; }) : <p className="muted sm-t">"Ideas" tab e "Ekhon analyze korun" chaple AI protita post er dhoron (product, recipe, review…) chine nibe.</p>}
           </section>
         </div>
-        <section className="card grid gap-2">
-          <h3 className="font-semibold">Shobcheye bhalo post</h3>
-          <PostList rows={A.top} />
-          {A.weak.length > 0 && <><h3 className="mt-2 font-semibold">Kom bhalo korse</h3><PostList rows={A.weak} /></>}
-        </section>
-        {d.audience.some((a) => a.age_gender?.length || a.city?.length) && (
-          <section className="card grid gap-3 lg:grid-cols-2">
-            {d.audience.map((a) => (<div key={a.account_doc} className="grid gap-2">
-              <h3 className="font-semibold">Instagram follower: boyosh o lingo</h3>
-              <Bars rows={(a.age_gender ?? []).sort((x, y) => x.key.localeCompare(y.key)).map((x) => ({ k: x.key, v: x.value, n: x.value }))} label={(k) => k.replace(' F', ' Nari').replace(' M', ' Purush').replace(' U', ' ?')} value={(v) => nf(v)} />
-              <h3 className="font-semibold">Shohor</h3>
-              <Bars rows={(a.city ?? []).map((x) => ({ k: x.key, v: x.value, n: x.value }))} label={(k) => k.split(',')[0]} value={(v) => nf(v)} />
-            </div>))}
+
+        {A.byNetwork.length > 1 && (
+          <section className="sm-card stack"><h3>Platform onujayi</h3>
+            <div className="sm-grid sm-g4">{A.byNetwork.map((x) => <div key={x.key} className="sm-acc" style={{ display: 'grid', gap: 4 }}><span className="row"><NetLogo net={x.key} size={20} /><b>{NET_NAME[x.key as Net] || x.key}</b></span><span className="sm-t">{x.posts} post · gor <b>{nf(x.avg_eng, 1)}</b></span>{x.avg_reach > 0 && <span className="muted xs">gor reach {compact(x.avg_reach)}</span>}</div>)}</div>
           </section>
         )}
-        <section className="card grid gap-2"><h3 className="font-semibold">Follower</h3><FollowerChart rows={d.followers} /></section>
+
+        <section className="sm-card stack"><span className="row"><h3>Shobcheye bhalo post</h3><span className="muted xs">engagement onujayi · click korle post khulbe</span></span>
+          <div className="sm-gal">{A.top.map((p) => <PostCard key={p.network + p.ext_id} p={p} />)}</div>
+          {A.weak.length > 0 && <><h3 style={{ marginTop: 8 }}>Kom bhalo korse</h3><div className="sm-gal">{A.weak.map((p) => <PostCard key={p.network + p.ext_id} p={p} />)}</div></>}
+        </section>
+
+        <div className="sm-grid sm-g2">
+          <section className="sm-card stack"><h3>Follower</h3><Followers rows={d.followers} /></section>
+          {d.audience.some((a) => a.age_gender?.length || a.city?.length) ? d.audience.map((a) => (
+            <section key={a.account_doc} className="sm-card stack"><span className="row"><NetLogo net="instagram" size={18} /><h3>Instagram follower ke</h3></span>
+              {(a.age_gender ?? []).sort((x, y) => x.key.localeCompare(y.key)).slice(0, 12).map((x) => { const m = Math.max(1, ...a.age_gender.map((y) => y.value)); return <div key={x.key} className="sm-hbar"><span className="xs">{x.key.replace(' F', ' · Nari').replace(' M', ' · Purush').replace(' U', ' · ?')}</span><div className="track"><div className="fill" style={{ width: (x.value / m) * 100 + '%', background: '#D6249F' }} /></div><span className="xs">{nf(x.value)}</span></div>; })}
+              {(a.city ?? []).length > 0 && <span className="muted xs">Shohor: {a.city.slice(0, 6).map((c) => c.key.split(',')[0] + ' ' + nf(c.value)).join(' · ')}</span>}
+            </section>)) : <section className="sm-card stack"><h3>Audience</h3><p className="muted sm-t">Instagram e 100+ follower hole boyosh, lingo, shohor ekhane ashbe.</p></section>}
+        </div>
       </>)}
     </div>
   );
 }
 
-function PostList({ rows }: { rows: PostRow[] }) {
+function PostCard({ p }: { p: PostRow }) {
   return (
-    <div className="grid gap-2">
-      {rows.map((p) => (
-        <a key={p.network + p.ext_id} href={p.permalink} target="_blank" rel="noreferrer" className="grid items-center gap-3 text-sm" style={{ gridTemplateColumns: '56px 1fr auto', border: '1px solid var(--line)', borderRadius: 8, padding: 6 }}>
-          {p.thumb ? <img src={p.thumb} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6 }} /> : <span style={{ width: 56, height: 56, borderRadius: 6, background: 'var(--line)', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}><NetIcon net={p.network} /></span>}
-          <span><span className="flex flex-wrap items-center gap-2"><NetIcon net={p.network} size={14} /><span className="muted text-xs">{new Date(p.created).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })} · {FORMAT_LABEL[p.format] || p.format}{p.content_type ? ' · ' + (TYPE_LABEL[p.content_type] || p.content_type) : ''}</span></span>
-            <span style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{p.text || '(lekha nai)'}</span></span>
-          <span className="text-right text-xs"><b className="text-sm">{nf(p.eng)}</b> engagement<br />{p.metrics.reach ? nf(p.metrics.reach) + ' reach' : ''}{p.rate != null ? ' · ' + nf(p.rate, 1) + '%' : ''}<br />👍 {nf(p.metrics.reactions)} 💬 {nf(p.metrics.comments)} ↪ {nf(p.metrics.shares)}{p.metrics.saves ? ' 🔖 ' + nf(p.metrics.saves) : ''}</span>
-        </a>
-      ))}
-    </div>
+    <a className="sm-gcard" href={p.permalink} target="_blank" rel="noreferrer">
+      {p.thumb ? <img className="img" src={p.thumb} alt="" loading="lazy" /> : <div className="img" style={{ display: 'grid', placeItems: 'center' }}><NetLogo net={p.network} size={36} /></div>}
+      <div className="body">
+        <span className="row muted xs" style={{ gap: 6 }}><NetLogo net={p.network} size={14} />{new Date(p.created).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+        <span className="clamp2">{p.text || <i className="muted">(lekha nai)</i>}</span>
+        <span className="row xs" style={{ gap: 6 }}><span className="sm-badge">{FORMAT_LABEL[p.format] || p.format}</span>{p.content_type && <span className="sm-badge">{TYPE_LABEL[p.content_type] || p.content_type}</span>}</span>
+        <span className="row xs" style={{ gap: 10, fontWeight: 600 }}><span className="row" style={{ gap: 3 }}><Icon name="heart" size={13} />{compact(p.metrics.reactions)}</span><span className="row" style={{ gap: 3 }}><Icon name="comment" size={13} />{compact(p.metrics.comments)}</span><span className="row" style={{ gap: 3 }}><Icon name="share" size={13} />{compact(p.metrics.shares)}</span>{(p.metrics.views || p.metrics.reach) ? <span className="row muted" style={{ gap: 3 }}><Icon name="eye" size={13} />{compact(p.metrics.views || p.metrics.reach)}</span> : null}</span>
+      </div>
+    </a>
   );
 }

@@ -18,7 +18,7 @@ export const PATCH = handle(async (req: Request, { params }: Ctx) => {
   const b = PostBody.parse(await req.json());
   if (b.action === 'schedule' && (!b.scheduled_at || Date.parse(b.scheduled_at) < Date.now() - 60e3)) throw Object.assign(new Error('Shamner ekta shomoy din'), { status: 400, code: 'bad_request' });
   const prev = new Map(post.targets.map((t) => [t.account_id, t]));
-  const next = { ...post, text: b.text, media: b.media, link: b.link || undefined, labels: b.labels, content_type: b.content_type,
+  const next = { ...post, text: b.text, media: b.media, link: b.link || undefined, labels: b.labels, content_type: b.content_type, options: b.options,
     targets: b.targets.map((t) => { const o = prev.get(t.account_id); return o?.status === 'published' ? o : { ...t, status: 'pending' as const }; }),
     scheduled_at: b.action === 'schedule' ? b.scheduled_at : null, status: b.action === 'schedule' ? 'scheduled' : 'draft', error: undefined };
   const s = await ref.set(next as never, { expectedVersion: cur.version });

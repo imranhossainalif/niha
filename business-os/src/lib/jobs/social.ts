@@ -6,18 +6,23 @@ import { db, type Data } from '../db';
 import { SYSTEM, type Principal } from '../access';
 import { bdToday } from '../time';
 import { analyze, type Insight } from '../social/analytics';
+import { mediaFile } from '../social/media';
+import { getAccess } from '../social/oauth';
+import { channel, publishYouTube, youtubePosts, type YtOptions } from '../social/youtube';
+import { profile, publishTikTok, tiktokPosts, type TtOptions } from '../social/tiktok';
 import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, publishFacebook, publishInstagram, socialToken, type Fetch, type Network } from '../social/meta';
 import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
 import { recordUsage } from '../aiUsage';
 
-export type Target = { account_id: string; network: Network; name?: string; text?: string; status?: 'pending' | 'published' | 'failed'; ext_post_id?: string; permalink?: string; error?: string; at?: string };
+export type Target = { account_id: string; network: Network; name?: string; text?: string; status?: 'pending' | 'published' | 'failed'; ext_post_id?: string; permalink?: string; error?: string; note?: string; at?: string };
+export type PostOptions = { yt_title?: string; yt_privacy?: YtOptions['privacy']; yt_kids?: boolean; tt_mode?: TtOptions['mode']; tt_privacy?: TtOptions['privacy'] };
 export type SocialPost = {
   business: string; status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed';
   text: string; media: { id: string; url: string; mime: string }[]; link?: string; labels?: string[]; content_type?: string;
-  targets: Target[]; scheduled_at?: string | null; published_at?: string; created_by?: string; error?: string;
+  targets: Target[]; scheduled_at?: string | null; published_at?: string; created_by?: string; error?: string; options?: PostOptions;
 };
-export type SocialAccount = { business: string; network: Network; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; active?: boolean };
+export type SocialAccount = { business: string; network: Network; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; active?: boolean; uploads?: string; error?: string };
 
 const accounts = async (business?: string) =>
   (await db().collection('social_accounts').limit(200).get()).map((s) => ({ id: s.id, ...(s.data as SocialAccount) })).filter((a) => a.active !== false && (!business || a.business === business));
@@ -31,8 +36,9 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
   if (post.status === 'publishing') throw Object.assign(new Error('Post ta ekhon publish hocche'), { status: 409, code: 'conflict' });
   // claim it (a second worker/click loses the version race)
   await ref.set({ ...post, status: 'publishing' }, { expectedVersion: snap.version });
-  const user = await socialToken();
-  const accts = new Map((await accounts(post.business)).map((a) => [a.id, a]));
+  const all = await accounts(post.business);
+  const user = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await socialToken() : '';
+  const accts = new Map(all.map((a) => [a.id, a]));
   const targets: Target[] = [];
   for (const t of post.targets) {
     if (t.status === 'published') { targets.push(t); continue; }
@@ -40,8 +46,10 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
     try {
       if (!a) throw new Error('Account ta ar connect nai');
       const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
-      const r = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f) : await publishInstagram(a.ext_id, a.page_id, input, user, f);
-      targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, error: undefined, at: new Date().toISOString() });
+      const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
+        : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
+        : await publishVideo(a.network, a.id, post, input.text, f);
+      targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
     } catch (e) {
       targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString() });
     }
@@ -51,6 +59,19 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
   const cur = (await ref.get())!;
   await ref.set({ ...(cur.data as SocialPost), targets, status, published_at: okN ? new Date().toISOString() : (cur.data as SocialPost).published_at, error: status === 'published' ? undefined : targets.filter((t) => t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ') } as unknown as Data);
   return { status, targets };
+}
+
+/** YouTube / TikTok take one video file from our media store. */
+async function publishVideo(net: Network, accountId: string, post: SocialPost, text: string, f?: Fetch) {
+  const vids = post.media.filter((m) => m.mime.startsWith('video/'));
+  if (vids.length !== 1 || post.media.length !== 1) throw new Error((net === 'youtube' ? 'YouTube' : 'TikTok') + ' e ekta video lagbe (chobi na)');
+  const file = await mediaFile(vids[0].id);
+  if (!file) throw new Error('Video file ta server e pawa jacche na — abar upload korun');
+  const token = await getAccess(net as 'youtube' | 'tiktok', accountId, f);
+  const o = post.options ?? {};
+  return net === 'youtube'
+    ? publishYouTube(file, text, { title: o.yt_title, privacy: o.yt_privacy, kids: o.yt_kids }, token, f)
+    : publishTikTok(file, text, { mode: o.tt_mode, privacy: o.tt_privacy }, token, f);
 }
 
 /** Worker, every minute: publish scheduled posts whose time has come. */
@@ -69,27 +90,38 @@ export async function publishDue(f?: Fetch) {
 export async function socialSync(opts: { days?: number; f?: Fetch } = {}) {
   const list = await accounts();
   if (!list.length) return { skipped: 'kono social account connect kora nai' };
-  const user = await socialToken();
+  const user = list.some((a) => a.network === 'facebook' || a.network === 'instagram') ? await socialToken() : '';
   const since = new Date(Date.now() - (opts.days ?? 90) * 864e5).toISOString();
   const ins = db().collection('social_insights');
   const today = bdToday();
   const res: Record<string, unknown> = {};
   for (const a of list) {
     try {
-      const posts = a.network === 'facebook' ? await facebookPosts(a.ext_id, since, user, opts.f) : await instagramPosts(a.ext_id, a.page_id, since, user, opts.f);
+      let posts, n: number | null;
+      if (a.network === 'youtube' || a.network === 'tiktok') {
+        const token = await getAccess(a.network, a.id, opts.f);
+        if (a.network === 'youtube') { const c = await channel(token, opts.f); n = c.followers; posts = c.uploads ? await youtubePosts(a.ext_id, c.uploads, since, token, opts.f) : []; }
+        else { n = (await profile(token, opts.f)).followers; posts = await tiktokPosts(a.ext_id, since, token, opts.f); }
+      } else {
+        posts = a.network === 'facebook' ? await facebookPosts(a.ext_id, since, user, opts.f) : await instagramPosts(a.ext_id, a.page_id, since, user, opts.f);
+        n = await followers(a.network, a.ext_id, a.page_id, user, opts.f);
+      }
       for (const p of posts) {
         const ref = ins.doc(p.network + '_' + p.ext_id);
         const cur = (await ref.get())?.data ?? {};
         await ref.set({ ...cur, ...p, business: a.business, account_doc: a.id, synced: new Date().toISOString() });
       }
-      const n = await followers(a.network, a.ext_id, a.page_id, user, opts.f);
       if (n != null) {
         await db().collection('social_daily').doc(a.id + '_' + today).set({ business: a.business, account_doc: a.id, network: a.network, date: today, followers: n });
         await db().collection('social_accounts').doc(a.id).update({ followers: n });
       }
       if (a.network === 'instagram') await db().collection('social_audience').doc(a.id).set({ business: a.business, account_doc: a.id, ...(await igAudience(a.ext_id, a.page_id, user, opts.f)), asof: new Date().toISOString() });
+      if (a.error) await db().collection('social_accounts').doc(a.id).update({ error: '' });
       res[a.id] = { posts: posts.length, followers: n };
-    } catch (e) { res[a.id] = { error: (e as Error).message }; }
+    } catch (e) {
+      res[a.id] = { error: (e as Error).message };
+      await db().collection('social_accounts').doc(a.id).update({ error: String((e as Error).message).slice(0, 300) }).catch(() => null);
+    }
   }
   // competitors' public Instagram posts (Business Discovery), per business
   const sets = await db().collection('social_settings').limit(50).get();

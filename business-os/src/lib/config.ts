@@ -15,6 +15,10 @@ export const CONFIG_FIELDS = [
   { key: 'META_VERIFY_TOKEN', label: 'Webhook verify token', group: 'Meta (InboxPilot)', secret: false, help: 'same text in Meta app → Webhooks' },
   { key: 'META_ADS_TOKEN', label: 'Ads token (ads_read, free Supermetrics bikolpo)', group: 'Meta (InboxPilot)', secret: true, help: 'Business Settings → System users → Generate token' },
   { key: 'META_SOCIAL_TOKEN', label: 'Social media token (post + insights; faka = Ads token use hobe)', group: 'Meta (InboxPilot)', secret: true, help: 'System user token: pages_manage_posts, pages_read_engagement, read_insights, instagram_basic, instagram_content_publish, instagram_manage_insights' },
+  { key: 'YOUTUBE_CLIENT_ID', label: 'YouTube (Google) OAuth client ID', group: 'YouTube + TikTok', secret: false, help: 'Google Cloud → APIs & Services → Credentials → OAuth client (Web)' },
+  { key: 'YOUTUBE_CLIENT_SECRET', label: 'YouTube (Google) OAuth client secret', group: 'YouTube + TikTok', secret: true, help: 'same OAuth client' },
+  { key: 'TIKTOK_CLIENT_KEY', label: 'TikTok client key', group: 'YouTube + TikTok', secret: false, help: 'developers.tiktok.com → your app → Credentials' },
+  { key: 'TIKTOK_CLIENT_SECRET', label: 'TikTok client secret', group: 'YouTube + TikTok', secret: true, help: 'same app' },
   { key: 'NUPORT_API_KEY', label: 'Nuport API key', group: 'Nuport', secret: true, help: 'Kids Care orders' },
   { key: 'NUPORT_START_SO', label: 'First run: last SO number already counted', group: 'Nuport', secret: false, help: 'e.g. 12345 (only used once)' },
   { key: 'SHEETS_PUSH_ENABLED', label: 'Accept pushes from the Google Apps Script', group: 'Google Sheets', secret: false, help: 'on/off (default on)' },
@@ -96,3 +100,16 @@ export async function saveConfig(values: Record<string, string>, by: string) {
   }
   clearConfigCache();
 }
+
+/* Per-account secrets (OAuth tokens for YouTube/TikTok): same encrypted table, keys "secret:<name>", never listed or synced. */
+export async function saveSecret(name: string, value: unknown) {
+  const key = 'secret:' + name, v = encrypt(JSON.stringify(value));
+  await prisma.setting.upsert({ where: { key }, create: { key, value: v, updatedBy: 'system' }, update: { value: v, updatedBy: 'system' } });
+  clearConfigCache();
+}
+export async function readSecret<T = any>(name: string): Promise<T | null> {
+  const r = await prisma.setting.findUnique({ where: { key: 'secret:' + name } });
+  const v = r ? decrypt(r.value) : null;
+  try { return v ? (JSON.parse(v) as T) : null; } catch { return null; }
+}
+export async function deleteSecret(name: string) { await prisma.setting.deleteMany({ where: { key: 'secret:' + name } }); clearConfigCache(); }

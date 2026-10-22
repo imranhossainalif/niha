@@ -6,7 +6,7 @@
 import { cfg } from '../config';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
-export type Network = 'facebook' | 'instagram';
+export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok';
 export type Fetch = typeof fetch;
 
 export class GraphError extends Error {
@@ -136,7 +136,7 @@ export async function publishInstagram(igId: string, pageId: string, input: Publ
 /* ---------- reading posts + metrics ---------- */
 export type PostStat = {
   network: Network; account_id: string; ext_id: string; created: string; text: string; permalink?: string; thumb?: string;
-  format: 'photo' | 'video' | 'reel' | 'carousel' | 'album' | 'text' | 'link' | 'other';
+  format: 'photo' | 'video' | 'reel' | 'short' | 'carousel' | 'album' | 'text' | 'link' | 'other';
   metrics: { reach?: number; views?: number; reactions: number; comments: number; shares: number; saves?: number; clicks?: number };
 };
 

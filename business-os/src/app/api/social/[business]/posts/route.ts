@@ -30,8 +30,9 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   const b = PostBody.parse(await req.json());
   if (b.action === 'schedule' && (!b.scheduled_at || Date.parse(b.scheduled_at) < Date.now() - 60e3)) throw Object.assign(new Error('Shamner ekta shomoy din'), { status: 400, code: 'bad_request' });
   if (b.targets.some((t) => t.network === 'instagram') && !b.media.length) throw Object.assign(new Error('Instagram e chobi ba video lagbe'), { status: 400, code: 'bad_request' });
+  if (b.targets.some((t) => t.network === 'youtube' || t.network === 'tiktok') && (b.media.length !== 1 || !b.media[0].mime.startsWith('video/'))) throw Object.assign(new Error('YouTube/TikTok e ekta video lagbe'), { status: 400, code: 'bad_request' });
   const doc: SocialPost & Record<string, unknown> = {
-    business, text: b.text, media: b.media, link: b.link || undefined, labels: b.labels, content_type: b.content_type,
+    business, text: b.text, media: b.media, link: b.link || undefined, labels: b.labels, content_type: b.content_type, options: b.options,
     targets: b.targets.map((t) => ({ ...t, status: 'pending' as const })),
     scheduled_at: b.action === 'schedule' ? b.scheduled_at : null,
     status: b.action === 'draft' ? 'draft' : 'scheduled', created_by: who(p), created_at: new Date().toISOString(),

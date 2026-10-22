@@ -13,7 +13,7 @@ export const GET = handle(async (req: Request) => {
   return json({ jobs: await prisma.job.findMany({ orderBy: { createdAt: 'desc' }, take: 50 }) });
 });
 
-const QUEUEABLE = ['nuport_sync', 'nuport_backfill', 'nuport_recompute', 'nuport_refetch', 'sheets_sync', 'inbox_import', 'backup', 'growth_weekly', 'competitor_weekly', 'loan_plan', 'learning_nudge'] as const;
+const QUEUEABLE = ['nuport_sync', 'nuport_backfill', 'nuport_recompute', 'nuport_refetch', 'sheets_sync', 'inbox_import', 'backup', 'growth_weekly', 'competitor_weekly', 'loan_plan', 'learning_nudge', 'health_check'] as const;
 const Body = z.object({ kind: z.enum(QUEUEABLE), params: z.record(z.unknown()).default({}) });
 
 /** Queue a background job (owner/admin): {kind, params}. The worker picks it up within seconds. */

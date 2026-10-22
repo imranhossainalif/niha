@@ -48,6 +48,9 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   `inbox_import`, `backup` (pg_dump), and AI jobs gated by `AI_JOBS=on`.
 - **Attendance tab (Kids Care):** `src/lib/legacy/attendance.ts`, from `sales_team/staff` + `staff_<YYYY-MM>` (team daily
   report sheet, parsed in `scripts/kc_sync.py` section 3, incl. office hours/fine rules from its সেটিংস tab).
+- **Settings → API o connection** (`/settings`): `src/lib/health.ts` checks every outside service live (Anthropic 1-token call,
+  Meta debug_token + ad accounts, Nuport, Make.com org) or by push freshness (Sheets, GA4), stored in `system_health/latest`
+  (hourly job `health_check`); `/api/health` feeds the dashboard warning. AI tokens per month: `src/lib/aiUsage.ts` → `system_usage`.
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations
   (`app_settings`, AES-256-GCM with a key from AUTH_SECRET, 30 s cache). Use it for every integration key; never read
   those from `process.env` directly. The worker checks keys at run time, so saving in Admin needs no restart.

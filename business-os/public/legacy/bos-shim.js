@@ -279,9 +279,22 @@
     me().then(function (m) {
       var bar = document.createElement('div');
       bar.style.cssText = 'position:fixed;right:8px;bottom:8px;z-index:50;font:12px system-ui;background:var(--panel,#fff);color:var(--ink,#222);border:1px solid var(--line,#ddd);border-radius:999px;padding:4px 10px;display:flex;gap:8px;align-items:center;opacity:.9';
-      bar.innerHTML = '<span></span><a href="/admin">Admin</a><a href="/logout">Logout</a>';
+      bar.innerHTML = '<span></span><a href="/settings">Settings</a><a href="/admin">Admin</a><a href="/logout">Logout</a>';
       bar.firstChild.textContent = m.email + ' · ' + m.role;
       document.body.appendChild(bar);
+      if (m.role === 'staff') return;
+      /* API / credit warning from the last hourly check (Settings → API o connection) */
+      fetch('/api/health', { credentials: 'same-origin' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (h) {
+        if (!h || (!h.bad && !h.warn)) return;
+        var names = h.items.filter(function (i) { return i.status === 'bad' || i.status === 'warn'; }).map(function (i) { return i.name + ': ' + i.summary; }).join('\n');
+        var a = document.createElement('a');
+        a.href = '/settings'; a.title = names;
+        a.textContent = (h.bad ? '⛔ ' + h.bad : '⚠️ ' + h.warn) + ' ta API te shomossa';
+        a.style.cssText = 'font-weight:600;color:' + (h.bad ? '#d64545' : '#b7791f');
+        bar.insertBefore(a, bar.firstChild);
+        var me = document.querySelector('.me');
+        if (me) { var dot = document.createElement('span'); dot.title = names; dot.textContent = h.bad ? '⛔' : '⚠️'; dot.style.cssText = 'margin-left:auto'; me.appendChild(dot); }
+      }).catch(function () {});
     }).catch(function () {});
   });
 })();

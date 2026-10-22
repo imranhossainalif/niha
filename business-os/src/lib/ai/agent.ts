@@ -9,6 +9,7 @@ import { bizName, BIZ_IDS } from '../business';
 import { bdToday, daysTo } from '../time';
 import { plMonth, plMonthList, pcVer, type State } from '../calc/pl';
 import { searchKnowledge } from '../kb/index';
+import { recordUsage } from '../aiUsage';
 
 type R = Record<string, any>;
 const cut = (s: unknown, n: number) => String(s ?? '').replace(/\s+/g, ' ').slice(0, n);
@@ -145,6 +146,7 @@ export async function runAgent(opts: {
     });
     if (opts.onText) stream.on('text', opts.onText);
     const msg = await stream.finalMessage();
+    void recordUsage(model, msg.usage).catch(() => {});
     stop = msg.stop_reason;
     const said = msg.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('');
     if (said) text = text ? text + '\n\n' + said : said;

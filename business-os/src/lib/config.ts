@@ -24,6 +24,8 @@ export const CONFIG_FIELDS = [
   { key: 'KC_SHEET_DAILY', label: 'Daily report sheet id', group: 'Google Sheets', secret: false, help: '' },
   { key: 'KC_SHEET_V6', label: 'Old Call System v6 sheet id', group: 'Google Sheets', secret: false, help: '' },
   { key: 'KC_SHEET_UPS_OLD', label: 'Old Up-sales tracker sheet id', group: 'Google Sheets', secret: false, help: '' },
+  { key: 'MAKE_API_TOKEN', label: 'Make.com API token (operation limit dekhte)', group: 'Make.com', secret: true, help: 'Make -> Profile -> API access -> Add token' },
+  { key: 'MAKE_ZONE', label: 'Make zone', group: 'Make.com', secret: false, help: 'default us2.make.com' },
   { key: 'SUPERMETRICS_API_KEY', label: 'Supermetrics API key', group: 'Other', secret: true, help: 'FB ads / page data' },
 ] as const;
 const KEYS = new Set<string>(CONFIG_FIELDS.map((f) => f.key));

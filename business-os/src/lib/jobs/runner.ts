@@ -6,6 +6,7 @@ import { nuportBackfill, nuportRecompute, nuportRefetch, nuportSync } from './nu
 import { sheetsSync } from './sheets';
 import { backup } from './backup';
 import { competitorWeekly, growthWeekly, learningNudge, loanPlan } from './ai_jobs';
+import { checkAll } from '../health';
 
 export const JOBS: Record<string, (params: any) => Promise<unknown>> = {
   nuport_sync: () => nuportSync(),
@@ -19,6 +20,7 @@ export const JOBS: Record<string, (params: any) => Promise<unknown>> = {
   competitor_weekly: () => competitorWeekly(),
   loan_plan: () => loanPlan(),
   learning_nudge: () => learningNudge(),
+  health_check: async () => { const h = await checkAll(); return { bad: h.bad, warn: h.warn }; },
 };
 
 const running = new Set<string>();

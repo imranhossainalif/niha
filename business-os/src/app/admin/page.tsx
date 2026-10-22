@@ -8,7 +8,8 @@ import { sessionPrincipal } from '@/lib/session';
 import { createApiKey } from '@/lib/apikeys';
 import { BIZ, BIZ_IDS } from '@/lib/business';
 import { getConfig, saveConfig } from '@/lib/inbox/store';
-import { configStatus, saveConfig as saveIntegrations, CONFIG_FIELDS } from '@/lib/config';
+import { configStatus } from '@/lib/config';
+import { IntegrationsForm } from '@/components/IntegrationsForm';
 import type { Role } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
@@ -69,20 +70,6 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     revalidatePath('/admin');
   }
 
-  async function saveKeys(fd: FormData) {
-    'use server';
-    const p = await requireAdmin(true);
-    const vals: Record<string, string> = {};
-    for (const f of CONFIG_FIELDS) {
-      const v = String(fd.get(f.key) ?? '').trim();
-      if (v === '-') vals[f.key] = '';
-      else if (v) vals[f.key] = f.key === 'GOOGLE_SERVICE_ACCOUNT_JSON' || !f.secret ? v : v.replace(/\s+/g, '');
-    }
-    await saveIntegrations(vals, p.kind === 'user' ? p.email : 'admin');
-    revalidatePath('/admin');
-    redirect('/admin?msg=saved');
-  }
-
   async function toggleAi() {
     'use server';
     await requireAdmin();
@@ -106,7 +93,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     <main className="mx-auto grid max-w-5xl gap-4 p-4">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="text-2xl font-semibold">Admin</h1>
-        <nav className="flex gap-2"><Link className="btn" href="/">Home</Link><a className="btn" href="/app">Dashboard</a></nav>
+        <nav className="flex gap-2"><Link className="btn" href="/">Home</Link><Link className="btn" href="/settings">Settings</Link><a className="btn" href="/app">Dashboard</a></nav>
       </header>
       {sp.msg && <p className="card text-sm">{MSG[sp.msg] ?? sp.msg}</p>}
       {newKeyShown && (
@@ -158,27 +145,9 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
 
       <section className="card grid gap-3">
         <h2 className="font-semibold">Integrations</h2>
+        <p className="text-sm">Kon API kaj korche, credit/limit koto baki: <Link className="link" href="/settings">Settings → API o connection</Link></p>
         <p className="muted text-sm">Key ekhane save korle server e encrypted thake, 30 second er moddhe chalu hoy, restart lage na. Faka rakhle ager value thake; muchte chaile <code>-</code> likhun. Server .env e thaka value shob shomoy agradhikar pay.</p>
-        {me.role === 'owner' ? (
-          <form action={saveKeys} className="grid gap-4">
-            {[...new Set(integrations.map((f) => f.group))].map((g) => (
-              <fieldset key={g} className="grid gap-2 sm:grid-cols-2">
-                <legend className="mb-1 font-semibold">{g}</legend>
-                {integrations.filter((f) => f.group === g).map((f) => (
-                  <label key={f.key} className="grid gap-1 text-sm">
-                    <span>{f.label} <span className="muted text-xs">{f.source === 'env' ? '· .env theke' : f.source === 'admin' ? '· saved ' + f.display : '· nai'}</span></span>
-                    {f.key === 'GOOGLE_SERVICE_ACCOUNT_JSON'
-                      ? <textarea className="input" name={f.key} rows={2} placeholder={f.source ? '(saved; notun dile bodlabe)' : f.help} disabled={f.source === 'env'} />
-                      : <input className="input" name={f.key} type={f.secret ? 'password' : 'text'} autoComplete="off" placeholder={f.source && f.secret ? '(saved; notun dile bodlabe)' : f.source ? String(f.display) : f.help} disabled={f.source === 'env'} />}
-                  </label>
-                ))}
-              </fieldset>
-            ))}
-            <div><button className="btn btn-primary" type="submit">Save integrations</button></div>
-          </form>
-        ) : (
-          <table className="t"><tbody>{integrations.map((f) => (<tr key={f.key}><td>{f.label}</td><td>{f.source ? '✓' : '— nai'}</td></tr>))}</tbody></table>
-        )}
+        <IntegrationsForm integrations={integrations} isOwner={me.role === 'owner'} back="/admin" />
       </section>
 
       <section className="card grid gap-2">

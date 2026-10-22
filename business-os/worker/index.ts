@@ -31,6 +31,7 @@ async function main() {
   schedule('50 8,13,20 * * *', 'nuport_sync', ['NUPORT_API_KEY']);
   schedule('55 8,13,20 * * *', 'sheets_sync', ['GOOGLE_SERVICE_ACCOUNT_JSON', 'KC_SHEET_CALL_LIVE']);
   if (!isOn(envVal('BACKUP_DISABLED'))) schedule('10 3 * * *', 'backup');
+  schedule('17 * * * *', 'health_check'); // API / connection status for Settings (hourly)
   schedule('47 11 * * 6', 'growth_weekly', ['ANTHROPIC_API_KEY'], 'AI_JOBS', { business: 'kidscare' });
   schedule('41 9 * * 6', 'competitor_weekly', ['ANTHROPIC_API_KEY'], 'AI_JOBS');
   schedule('5 9 1,20 * *', 'loan_plan', ['ANTHROPIC_API_KEY'], 'AI_JOBS');

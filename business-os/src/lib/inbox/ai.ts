@@ -2,6 +2,7 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { anthropic, MODEL } from '../anthropic';
 import type { InboxMessage, Order } from './store';
+import { recordUsage } from '../aiUsage';
 
 export const INTENTS = ['price', 'order', 'delivery', 'complaint', 'product_info', 'other'] as const;
 export const MOODS = ['happy', 'normal', 'angry'] as const;
@@ -89,6 +90,7 @@ export async function decide(agentName: string, kb: string, rules: string, histo
     messages: toTurns(history),
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   } as Anthropic.MessageCreateParamsNonStreaming);
+  void recordUsage(String(res.model), res.usage).catch(() => {});
   if (res.stop_reason === 'refusal') return { reply: '', intent: 'other', mood: 'normal', needs_human: true, lead_score: 0, order: {} };
   const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('');
   return parseDecision(text);

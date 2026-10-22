@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { anthropic, MODEL, MODEL_COMPLEX } from '@/lib/anthropic';
 import { handle } from '@/lib/http';
 import { needPrincipal } from '@/lib/apiutil';
+import { recordUsage } from '@/lib/aiUsage';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,6 +55,7 @@ export const POST = handle(async (req: Request) => {
           if (ev.type === 'content_block_delta' && ev.delta.type === 'text_delta') send({ type: 'text', text: ev.delta.text });
         }
         const msg = await stream.finalMessage();
+        void recordUsage(model, msg.usage).catch(() => {});
         send({ type: 'done', message: { content: msg.content, stop_reason: msg.stop_reason, usage: msg.usage } });
       } catch (e) {
         send({ type: 'error', code: errCode(e), message: (e as Error).message?.slice(0, 300) });

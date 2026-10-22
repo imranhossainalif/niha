@@ -94,6 +94,11 @@ export const PATCHES: Patch[] = [
     find: "if (tab === 'briefing') return [...agBriefing(), r90Card(id), ...bizBriefing(id)].filter(Boolean);",
     replace: "if (tab === 'briefing') return [...agBriefing(), webTodayCard(id), r90Card(id), ...bizBriefing(id)].filter(Boolean);",
   },
+  {
+    name: 'Sidebar profile opens Settings (API o connection, keys, limits)',
+    find: '<div class="me"><i>I</i><div><b>Imran Hossain Alif</b><br>Owner</div></div>',
+    replace: '<a class="me" href="/settings" title="Settings: API o connection, credit o limit" style="text-decoration:none;color:inherit;cursor:pointer"><i>I</i><div><b>Imran Hossain Alif</b><br>Owner · ⚙ Settings</div></a>',
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {

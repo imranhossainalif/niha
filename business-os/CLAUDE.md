@@ -51,6 +51,14 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
 - **Settings → API o connection** (`/settings`): `src/lib/health.ts` checks every outside service live (Anthropic 1-token call,
   Meta debug_token + ad accounts, Nuport, Make.com org) or by push freshness (Sheets, GA4), stored in `system_health/latest`
   (hourly job `health_check`); `/api/health` feeds the dashboard warning. AI tokens per month: `src/lib/aiUsage.ts` → `system_usage`.
+- **Social Media (Kids Care tab, Publer-like):** native page `/social/[business]` (`src/components/social/*`), shown in the legacy
+  tab through ONE permanent iframe laid over a placeholder (the legacy page re-draws `#view` on every data update; a re-created
+  frame would reload and lose a draft). Graph API in `src/lib/social/meta.ts` (system-user token `META_SOCIAL_TOKEN` → page
+  tokens on the fly; FB photo/album/video/link, IG photo/reel/carousel; posts + insights; IG Business Discovery for competitors).
+  Jobs `src/lib/jobs/social.ts`: publish due posts (worker checks every minute), `social_sync` (3 h), `social_ideas` (AI plan,
+  Wed+Sat). Media files: `src/lib/social/media.ts` → Docker volume `media`, public at `/media/<id>`. Analytics math:
+  `src/lib/social/analytics.ts` (BD hours). Collections: social_accounts/posts/insights/daily/audience/competitors/settings/ai.
+  Meta does not allow posting to Facebook groups by API: groups are suggestions only.
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations
   (`app_settings`, AES-256-GCM with a key from AUTH_SECRET, 30 s cache). Use it for every integration key; never read
   those from `process.env` directly. The worker checks keys at run time, so saving in Admin needs no restart.

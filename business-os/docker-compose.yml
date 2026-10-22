@@ -19,8 +19,9 @@ services:
     env_file: .env
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-bos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-business_os}
+      MEDIA_DIR: /app/media
     depends_on: { postgres: { condition: service_healthy } }
-    volumes: [./data:/app/data:ro]
+    volumes: [./data:/app/data:ro, media:/app/media]
 
   worker:
     build: .
@@ -30,8 +31,9 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-bos}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-business_os}
       BACKUP_DIR: /app/backups
+      MEDIA_DIR: /app/media
     depends_on: { web: { condition: service_started } }
-    volumes: [./backups:/app/backups]
+    volumes: [./backups:/app/backups, media:/app/media]
 
   caddy:
     image: caddy:2-alpine
@@ -47,5 +49,6 @@ services:
 
 volumes:
   pgdata:
+  media: # uploaded post photos/videos, served at /media (owner comes from the image)
   caddy_data:
   caddy_config:

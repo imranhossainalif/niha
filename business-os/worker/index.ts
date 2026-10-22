@@ -3,6 +3,7 @@
 // so saving a key in Admin is enough (no restart). AI jobs cost API credits and only run with AI_JOBS=on.
 import cron from 'node-cron';
 import { drainQueue, runJob } from '../src/lib/jobs/runner';
+import { db } from '../src/lib/db';
 import { prisma } from '../src/lib/prisma';
 import { cfg, envVal, isOn, type ConfigKey } from '../src/lib/config';
 
@@ -32,6 +33,15 @@ async function main() {
   schedule('55 8,13,20 * * *', 'sheets_sync', ['GOOGLE_SERVICE_ACCOUNT_JSON', 'KC_SHEET_CALL_LIVE']);
   if (!isOn(envVal('BACKUP_DISABLED'))) schedule('10 3 * * *', 'backup');
   schedule('17 * * * *', 'health_check'); // API / connection status for Settings (hourly)
+  schedule('23 */3 * * *', 'social_sync'); // Facebook/Instagram posts, metrics, followers, competitors
+  schedule('35 7 * * 3,6', 'social_ideas', ['ANTHROPIC_API_KEY'], undefined, { business: 'kidscare' }); // AI social plan, Wed + Sat
+  // scheduled posts: checked every minute, a job row only when something was due
+  cron.schedule('* * * * *', async () => {
+    try {
+      const n = (await db().collection('social_posts').where('status', '==', 'scheduled').limit(500).get()).filter((s) => String(s.data.scheduled_at || '9') <= new Date().toISOString()).length;
+      if (n) await runJob('social_publish');
+    } catch (e) { console.error('[worker] social_publish', e); }
+  }, TZ);
   schedule('47 11 * * 6', 'growth_weekly', ['ANTHROPIC_API_KEY'], 'AI_JOBS', { business: 'kidscare' });
   schedule('41 9 * * 6', 'competitor_weekly', ['ANTHROPIC_API_KEY'], 'AI_JOBS');
   schedule('5 9 1,20 * *', 'loan_plan', ['ANTHROPIC_API_KEY'], 'AI_JOBS');

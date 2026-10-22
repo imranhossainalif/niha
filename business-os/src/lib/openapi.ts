@@ -10,7 +10,7 @@ const ok = (schema: object, d = 'OK') => ({ description: d, content: { 'applicat
 export function openapi(origin: string) {
   return {
     openapi: '3.1.0',
-    info: { title: 'Business OS API', version: '1.4.1', description: 'Read and write every Business OS collection. Auth: `Authorization: Bearer <key>` (owner creates keys in Admin). Keys act as their owner, limited to read or read+write. Staff keys only see their assigned businesses.' },
+    info: { title: 'Business OS API', version: '1.5.0', description: 'Read and write every Business OS collection. Auth: `Authorization: Bearer <key>` (owner creates keys in Admin). Keys act as their owner, limited to read or read+write. Staff keys only see their assigned businesses.' },
     servers: [{ url: origin }],
     security: [{ bearer: [] }],
     components: {
@@ -19,6 +19,12 @@ export function openapi(origin: string) {
     },
     paths: {
       '/api/v1/me': { get: { summary: 'Who this key/session is', responses: { 200: ok({ type: 'object' }), 401: err } } },
+      '/api/social/{business}/posts': { get: { summary: 'Social posts for the calendar (?from&to YYYY-MM-DD)', parameters: [{ name: 'business', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }), 401: err } }, post: { summary: 'Create a post: action draft | schedule (scheduled_at ISO) | now; targets = connected account ids', parameters: [{ name: 'business', in: 'path', required: true, schema: { type: 'string' } }], responses: { 201: ok({ type: 'object' }), 400: err, 401: err } } },
+      '/api/social/posts/{id}': { patch: { summary: 'Edit a draft/scheduled post', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }), 409: err } }, delete: { summary: 'Remove from the calendar', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }) } } },
+      '/api/social/posts/{id}/publish': { post: { summary: 'Publish now / retry failed targets', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }) } } },
+      '/api/social/media': { post: { summary: 'Upload a photo/video (multipart "file"); returns its public URL', responses: { 201: ok({ type: 'object' }), 400: err } } },
+      '/api/social/{business}/analytics': { get: { summary: 'Post performance: best hour/day/format/type, top posts (?days, ?network)', parameters: [{ name: 'business', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }) } } },
+      '/api/social/{business}/research': { get: { summary: 'AI social plan, competitors, research settings', parameters: [{ name: 'business', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }) } } },
       '/api/health': { get: { summary: 'Last connection/limit check of every outside API (owner/admin)', responses: { 200: ok({ type: 'object' }), 401: err, 403: err } }, post: { summary: 'Run the connection/limit check now (owner/admin, write)', responses: { 200: ok({ type: 'object' }), 401: err, 403: err } } },
       '/api/v1/docs/{collection}': {
         get: {

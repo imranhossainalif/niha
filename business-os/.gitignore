@@ -8,3 +8,4 @@ data/
 backups/
 *.tsbuildinfo
 next-env.d.ts
+/media/

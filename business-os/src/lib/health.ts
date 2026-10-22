@@ -266,8 +266,34 @@ async function serverCheck(): Promise<Health> {
   return { ...base, status, summary, details, limits };
 }
 
+
+const SOCIAL_SCOPES = ['pages_manage_posts', 'pages_read_engagement', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights'];
+async function socialCheck(): Promise<Health> {
+  const base = { id: 'social', name: 'Social Media (Facebook + Instagram post)', keys: ['META_SOCIAL_TOKEN'] as ConfigKey[], links: [{ label: 'System users', url: 'https://business.facebook.com/settings/system-users' }] };
+  const own = await cfg('META_SOCIAL_TOKEN');
+  const token = own || (await cfg('META_ADS_TOKEN'));
+  const accts = (await db().collection('social_accounts').limit(100).get()).map((x) => x.data as { name: string; network: string; active?: boolean }).filter((a) => a.active !== false);
+  if (!token) return { ...base, status: 'off', summary: 'Social token nai — post/schedule kora jabe na.', fix: 'Kids Care → Social Media → Accounts e step gulo dekhun.' };
+  const t = await debugToken(token);
+  if (!t.is_valid) return { ...base, status: 'bad', summary: 'Social token kaj korche na.', details: [['Meta bolche', t.error?.message || 'invalid token']], fix: 'Notun system user token banan.' };
+  const missing = SOCIAL_SCOPES.filter((x) => !(t.scopes ?? []).includes(x));
+  const since = new Date(Date.now() - 24 * HOUR).toISOString();
+  const failed = await db().collection('social_posts').where('status', 'in', ['failed', 'partial']).limit(200).get();
+  const recentFail = failed.map((x) => x.data as { published_at?: string; scheduled_at?: string; error?: string }).filter((x) => String(x.scheduled_at || x.published_at || '') >= since);
+  const sync = await lastJob('social_sync');
+  const details: [string, string][] = [['Token', own ? 'Social token' : 'Ads token (post korar permission thakbe na)'], ['Connect kora', accts.map((a) => (a.network === 'instagram' ? 'IG ' : 'FB ') + a.name).join(', ') || 'kichu na'],
+    ['Shesh data sync', sync ? ago(sync.createdAt) + ' · ' + sync.status : '—'], ...tokenLines(t).details];
+  for (const f of recentFail.slice(0, 5)) details.push(['Hoyni', String(f.error || '').slice(0, 200)]);
+  const notes: string[] = []; const st: Status[] = ['ok'];
+  if (missing.length) { st.push(accts.length ? 'bad' : 'warn'); notes.push('Token e permission nai: ' + missing.join(', ') + '.'); }
+  if (!accts.length) { st.push('warn'); notes.push('Kono page/Instagram connect kora nai.'); }
+  if (recentFail.length) { st.push('bad'); notes.push('Shesh 24 ghontay ' + recentFail.length + ' ta post publish hoyni.'); }
+  if (sync?.status === 'failed') { st.push('warn'); notes.push('Shesh data sync e error.'); }
+  return { ...base, status: worst(st), summary: notes.join(' ') || 'Kaj korche: ' + accts.length + ' ta account connect.', details, fix: missing.length ? 'System user e notun token banan ei permission gulo tick kore (Social Media → Accounts e step ache), Settings e "Social media token" e boshan.' : notes.length ? notes.join(' ') : undefined };
+}
+
 const CHECKS: [string, () => Promise<Health>][] = [
-  ['anthropic', anthropicCheck], ['meta_page', metaPageCheck], ['meta_ads', metaAdsCheck], ['nuport', nuportCheck], ['sheets', sheetsCheck],
+  ['anthropic', anthropicCheck], ['meta_page', metaPageCheck], ['meta_ads', metaAdsCheck], ['social', socialCheck], ['nuport', nuportCheck], ['sheets', sheetsCheck],
   ['ga4_kidscare', () => ga4Check('kidscare', 'Kids Care BD')], ['ga4_lrf', () => ga4Check('lrf', 'Local Revenue Flow')],
   ['make', makeCheck], ['supermetrics', supermetricsCheck], ['worker', workerCheck], ['server', serverCheck],
 ];

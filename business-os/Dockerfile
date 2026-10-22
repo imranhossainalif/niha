@@ -12,7 +12,7 @@ RUN npx prisma generate && npx next build
 FROM base AS run
 ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
 COPY --from=build /app ./
-RUN addgroup -S app && adduser -S app -G app && mkdir -p /app/backups && chown -R app:app /app/backups /app/.next
+RUN addgroup -S app && adduser -S app -G app && mkdir -p /app/backups /app/media && chown -R app:app /app/backups /app/media /app/.next
 USER app
 EXPOSE 3000
 CMD ["sh", "-c", "npx prisma migrate deploy && npx next start"]

@@ -3,6 +3,7 @@
 // (so a change to the legacy file can't silently drop a patch). Remove a patch once its tab is ported natively.
 import { SALES_LIVE_JS } from './salesLive';
 import { ORDER_SOURCE_JS } from './orderSource';
+import { WEB_TRAFFIC_JS } from './webTraffic';
 
 export type Patch = { name: string; find: string; replace: string };
 
@@ -55,12 +56,17 @@ export const PATCHES: Patch[] = [
   {
     name: 'Kids Care Sales: order source card (call / WhatsApp / Messenger / website / ads) by day, month or year',
     find: 'function bizSales(id) {',
-    replace: ORDER_SOURCE_JS + "function bizSales(id) { const __o = bizSalesBase(id); return id === 'kidscare' ? [...orderSourceCard(id), ...__o] : __o; }\nfunction bizSalesBase(id) {",
+    replace: ORDER_SOURCE_JS + WEB_TRAFFIC_JS + "function bizSales(id) { const __o = bizSalesBase(id); return id === 'kidscare' ? [...orderSourceCard(id), ...__o] : __o; }\nfunction bizSalesBase(id) {",
   },
   {
     name: 'Sync web_traffic (GA4) into the page too',
     find: "'ib_kb', 'ib_broadcasts'];",
-    replace: "'ib_kb', 'ib_broadcasts', 'web_traffic'];",
+    replace: "'ib_kb', 'ib_broadcasts', 'web_traffic', 'ai_brief'];",
+  },
+  {
+    name: 'Kids Care Briefing: website today card at the top',
+    find: "  if (tab === 'briefing') { const p = bizBriefing(id); return [p[0], id === 'kidscare' ? kcSprint(false) : null,",
+    replace: "  if (tab === 'briefing') { const p = bizBriefing(id); return [p[0], ...(id === 'kidscare' ? kcTopCards(id) : []), id === 'kidscare' ? kcSprint(false) : null,",
   },
 ];
 

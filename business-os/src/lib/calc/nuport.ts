@@ -18,7 +18,9 @@ export type NuportOrder = {
   campaign_id?: string | null;
   web_meta?: boolean; // website order carried session info (false = e.g. abandoned-cart recovery)
   author?: string | null; // Nuport user who entered it
+  items?: OrderItem[];
 };
+export type OrderItem = { sku: string; name: string; qty: number; price: number; discount: number };
 
 /** Keep only the fields we need (no customer data). */
 export const slim = (o: any): NuportOrder => {
@@ -29,6 +31,9 @@ export const slim = (o: any): NuportOrder => {
     source: o?.source ?? null, custom_source: o?.customOrderSource?.name ?? null,
     web_origin: m.origin ?? null, utm_medium: m.utmMedium ?? null, source_type: m.sourceType ?? null, campaign_id: m.campaignId ?? null,
     web_meta: !!(m.origin || m.sourceType || m.utmMedium), author: o?.authorId ?? null,
+    items: Array.isArray(o?.salesOrderItems)
+      ? o.salesOrderItems.map((it: any) => ({ sku: String(it?.product?.sku ?? ''), name: String(it?.product?.name ?? '').slice(0, 120), qty: Number(it?.quantity) || 0, price: Number(it?.price) || 0, discount: Number(it?.discountAmount) || 0 }))
+      : undefined,
   };
 };
 
@@ -57,6 +62,20 @@ export function orderChannel(o: NuportOrder): string {
   return 'other';
 }
 
+export type ProductStats = { name: string; sku: string; qty: number; revenue: number; orders: number };
+/** Product key: SKU when present, else the name (used to join with pc_items). */
+export const productKey = (it: OrderItem) => (it.sku || it.name).replace(/[.$/#[\]]/g, '_').slice(0, 80) || 'unknown';
+function byProduct(orders: NuportOrder[]): Record<string, ProductStats> {
+  const out: Record<string, ProductStats> = {};
+  for (const o of orders) for (const it of o.items ?? []) {
+    const k = productKey(it);
+    const x = (out[k] ??= { name: it.name, sku: it.sku, qty: 0, revenue: 0, orders: 0 });
+    x.qty += it.qty; x.revenue += it.qty * it.price - it.discount; x.orders++;
+  }
+  for (const x of Object.values(out)) x.revenue = pyRound(x.revenue);
+  return out;
+}
+
 export type ChannelStats = { orders: number; cancelled: number; sent: number; sent_amount: number; in_transit: number; in_transit_amount: number; delivered: number; delivered_amount: number; returned: number };
 
 // Python's round() is banker's rounding; match it so numbers equal the old script's.
@@ -75,6 +94,8 @@ export type SalesDaily = {
   delivered: number; delivered_amount: number; cash_due: number;
   /** orders created that day, split by channel (only when every order of the day carries a source) */
   by_channel?: Record<string, ChannelStats>;
+  /** products in orders created that day that went to the courier (returns excluded), when every order has items */
+  by_product?: Record<string, ProductStats>;
 };
 
 /** One row per BD date. `sent` = created that day and handed to the courier; `delivered` = delivered that day (any creation date). */
@@ -94,6 +115,7 @@ export function salesDaily(orders: NuportOrder[], days: string[], asof = new Dat
       sent_in_transit: tr.length, sent_in_transit_amount: amt(tr), sent_returned: ret.length, sent_other: sent.length - dl.length - tr.length - ret.length,
       delivered: D.length, delivered_amount: amt(D), cash_due: 0,
       ...(C.every((o) => o.source !== undefined) ? { by_channel: byChannel(C) } : {}),
+      ...(C.length && C.every((o) => Array.isArray(o.items)) ? { by_product: byProduct(sent.filter((o) => !o.is_return)) } : {}),
     };
   });
 }

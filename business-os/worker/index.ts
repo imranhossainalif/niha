@@ -8,7 +8,7 @@ import { cfg, envVal, isOn, type ConfigKey } from '../src/lib/config';
 
 const TZ = { timezone: 'Asia/Dhaka' };
 // long jobs that pick up where they stopped, so a restart just queues them again
-const RESUMABLE = ['nuport_backfill', 'nuport_recompute', 'inbox_import'];
+const RESUMABLE = ['nuport_backfill', 'nuport_recompute', 'nuport_refetch', 'inbox_import'];
 /** Run `kind` on `expr` when every key in `needs` is set (and `flag`, if given, is on). */
 const schedule = (expr: string, kind: string, needs: ConfigKey[] = [], flag?: ConfigKey, params: unknown = {}) => {
   cron.schedule(expr, async () => {

@@ -2,7 +2,7 @@
 // (from Admin, POST /api/inbox/import, or the API).
 import { prisma } from '../prisma';
 import { importHistory } from '../inbox/process';
-import { nuportBackfill, nuportRecompute, nuportSync } from './nuport';
+import { nuportBackfill, nuportRecompute, nuportRefetch, nuportSync } from './nuport';
 import { sheetsSync } from './sheets';
 import { backup } from './backup';
 import { competitorWeekly, growthWeekly, learningNudge, loanPlan } from './ai_jobs';
@@ -10,6 +10,7 @@ import { competitorWeekly, growthWeekly, learningNudge, loanPlan } from './ai_jo
 export const JOBS: Record<string, (params: any) => Promise<unknown>> = {
   nuport_sync: () => nuportSync(),
   nuport_backfill: (p) => nuportBackfill({ fromDate: String(p?.from_date || '') }),
+  nuport_refetch: (p) => nuportRefetch({ days: Number(p?.days) || 120 }),
   nuport_recompute: (p) => nuportRecompute({ fromDate: String(p?.from_date || '') }),
   sheets_sync: () => sheetsSync(),
   inbox_import: (p) => importHistory(Number(p?.days) || 30),

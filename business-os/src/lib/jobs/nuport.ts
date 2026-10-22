@@ -163,3 +163,22 @@ export async function nuportRecompute(opts: { fromDate: string; today?: string }
   const days = await writeSalesDaily(all, opts.fromDate, opts.today ?? bdToday());
   return { orders: all.length, days: days.length, first_day: days[0] ?? null };
 }
+
+/** Re-fetch stored orders created in the last `days` days (adds product lines to older orders), then recompute. */
+export async function nuportRefetch(opts: { days: number; key?: string; today?: string }) {
+  const key = opts.key ?? (await cfg('NUPORT_API_KEY'));
+  if (!key) throw new Error('NUPORT_API_KEY is not set (Admin → Integrations)');
+  const today = opts.today ?? bdToday();
+  const from = addDays(today, -Math.max(1, Math.min(800, opts.days || 120)));
+  let all = await storedOrders();
+  const todo = all.filter((o) => (bdDate(o.created) ?? '') >= from && !Array.isArray(o.items));
+  let done = 0;
+  for (let i = 0; i < todo.length; i += 40) {
+    const chunk = todo.slice(i, i + 40);
+    const got = await pool(chunk, 4, (o) => fetchOrder(o.so, key).catch(() => null));
+    for (let j = 0; j < chunk.length; j++) if (got[j]) { await save(chunk[j].so, got[j]!); done++; }
+  }
+  all = await storedOrders();
+  const days = await writeSalesDaily(all, from, today);
+  return { refetched: done, of: todo.length, days: days.length };
+}

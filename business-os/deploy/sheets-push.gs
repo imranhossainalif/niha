@@ -1,11 +1,11 @@
 /**
- * Business OS — Kids Care sales-team sheets → https://os.osmanhadi.live (every 30 minutes).
+ * Business OS — Kids Care sales-team sheets → https://os.osmanhadi.live (every 10 minutes).
  *
  * Setup (once, in the Google account that owns the sheets):
  *  1. https://script.google.com → New project → paste this whole file.
  *  2. Put your Business OS API key (Admin → API keys, write) in BOS_API_KEY below.
  *  3. Choose function "setup" at the top → Run → allow the permissions.
- *     It sends the sheets once and then every 30 minutes.
+ *     It sends the sheets once and then every 10 minutes.
  * Check: View → Executions, or Business OS Admin → Background jobs ("sheets_push").
  */
 const BOS_URL = 'https://os.osmanhadi.live/api/integrations/sheets';
@@ -22,7 +22,7 @@ const LIVE_TAB = 'Live_Dashboard';
 
 function setup() {
   ScriptApp.getProjectTriggers().forEach(function (t) { if (t.getHandlerFunction() === 'push') ScriptApp.deleteTrigger(t); });
-  ScriptApp.newTrigger('push').timeBased().everyMinutes(30).create();
+  ScriptApp.newTrigger('push').timeBased().everyMinutes(10).create();
   push();
 }
 

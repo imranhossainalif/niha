@@ -14,7 +14,7 @@ export type SheetFiles = { callLiveCsv: Buffer; upsalesXlsx: Buffer; dailyXlsx: 
 
 function run(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
-    const p = spawn(cmd, args, { env: process.env });
+    const p = spawn(cmd, args, { env: { ...process.env, TZ: '<+06>-6' } }); // Asia/Dhaka without tzdata: "today" in the sheets is BD time
     let out = '', errOut = '';
     p.stdout.on('data', (d) => (out += d)); p.stderr.on('data', (d) => (errOut += d));
     p.on('error', reject);

@@ -46,6 +46,8 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
 - **Worker:** `worker/index.ts` (cron, Asia/Dhaka) + `src/lib/jobs/runner.ts` (registry + `jobs` table queue, claimed with
   `FOR UPDATE SKIP LOCKED`). Jobs: `nuport_sync`, `sheets_sync` (downloads sheets, runs `scripts/kc_sync.py` unchanged),
   `inbox_import`, `backup` (pg_dump), and AI jobs gated by `AI_JOBS=on`.
+- **Attendance tab (Kids Care):** `src/lib/legacy/attendance.ts`, from `sales_team/staff` + `staff_<YYYY-MM>` (team daily
+  report sheet, parsed in `scripts/kc_sync.py` section 3, incl. office hours/fine rules from its সেটিংস tab).
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations
   (`app_settings`, AES-256-GCM with a key from AUTH_SECRET, 30 s cache). Use it for every integration key; never read
   those from `process.env` directly. The worker checks keys at run time, so saving in Admin needs no restart.

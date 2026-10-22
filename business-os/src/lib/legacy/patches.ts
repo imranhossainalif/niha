@@ -4,6 +4,7 @@
 import { SALES_LIVE_JS } from './salesLive';
 import { ORDER_SOURCE_JS } from './orderSource';
 import { WEB_TRAFFIC_JS } from './webTraffic';
+import { ATTENDANCE_JS } from './attendance';
 
 export type Patch = { name: string; find: string; replace: string };
 
@@ -67,6 +68,26 @@ export const PATCHES: Patch[] = [
     name: 'Kids Care Briefing: website today card at the top',
     find: "  if (tab === 'briefing') { const p = bizBriefing(id); return [p[0], id === 'kidscare' ? kcSprint(false) : null,",
     replace: "  if (tab === 'briefing') { const p = bizBriefing(id); return [p[0], ...(id === 'kidscare' ? kcTopCards(id) : []), id === 'kidscare' ? kcSprint(false) : null,",
+  },
+  {
+    name: 'Attendance tab: code (team daily report sheet → hajira, ghonta, score, leaderboard)',
+    find: 'function bizTeam(id) {',
+    replace: ATTENDANCE_JS + 'function bizTeam(id) {',
+  },
+  {
+    name: 'Attendance tab: in the business tab bar, after Sales Team',
+    find: "['salesteam', 'Sales Team'], ",
+    replace: "['salesteam', 'Sales Team'], ['attendance', 'Attendance'], ",
+  },
+  {
+    name: 'Attendance tab: allowed route',
+    find: "'sales','salesteam','finance'",
+    replace: "'sales','salesteam','attendance','finance'",
+  },
+  {
+    name: 'Attendance tab: view',
+    find: 'sales: bizSales, salesteam: bizSalesTeam, finance: bizFinance, operations: bizOperations, product: bizProduct, content: bizContent, team: bizTeam',
+    replace: 'sales: bizSales, salesteam: bizSalesTeam, attendance: attendanceView, finance: bizFinance, operations: bizOperations, product: bizProduct, content: bizContent, team: bizTeam',
   },
 ];
 

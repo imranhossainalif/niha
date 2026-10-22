@@ -181,13 +181,33 @@ put("sales_team", "upsell_daily", {"asof": NOW, "days": [
 # ---------- 3. Staff daily reports ----------
 wb = openpyxl.load_workbook(daily_x, data_only=True, read_only=True)
 people = []
+def hm(v):  # time cell -> "HH:MM" (text or datetime.time), "" if empty
+    if isinstance(v, (datetime.time, datetime.datetime)): return v.strftime("%H:%M")
+    m = re.match(r"^\s*(\d{1,2})[:.](\d{2})", str(v or ""))
+    return "%02d:%s" % (int(m.group(1)), m.group(2)) if m else ""
+office = {}
+if "সেটিংস" in wb.sheetnames:
+    cfg_rows = [list(r) for r in wb["সেটিংস"].iter_rows(values_only=True)]
+    lab = {str(r[1]).strip(): r[2] for r in cfg_rows if len(r) > 2 and r[1]}
+    office = {"in": hm(lab.get("অফিসে ঢোকার সময়")), "out": hm(lab.get("অফিস থেকে বের হওয়ার সময়")),
+              "off_day": num(lab.get("সাপ্তাহিক ছুটির দিন")), "fine_after": num(lab.get("কত দিন রিপোর্ট না দিলে জরিমানা")),
+              "fine_tk": num(lab.get("জরিমানার টাকা (৳)")), "fine_from": iso(lab.get("জরিমানা গণনা শুরু")) or ""}
+    hdr_i = next((k for k, r in enumerate(cfg_rows) if len(r) > 2 and r[1] == "Tab" and r[2] == "নাম"), None)
+    targets = {}
+    if hdr_i is not None:
+        for r in cfg_rows[hdr_i + 1:]:
+            if len(r) < 17 or not r[2]: break
+            targets[str(r[2])] = {"metrics": [str(x) for x in r[4:10]], "targets": [num(x) for x in r[10:16]], "hours": num(r[16])}
+    office["targets"] = targets
+show_month = None
 for ws in wb.worksheets:
     raw = [list(r) for r in ws.iter_rows(values_only=True)]
     hi = next((k for k, r in enumerate(raw) if r and r[0] == "তারিখ"), None)
     if hi is None or len(raw) < 3 or raw[1][0] != "নাম": continue
     name = raw[1][1]
     if not name: continue
-    role = raw[1][3] or ""
+    role = str(raw[1][4] or "") if len(raw[1]) > 4 else ""
+    if len(raw[1]) > 10 and iso(raw[1][10]): show_month = iso(raw[1][10])[:7]
     summ = raw[2]
     hdr = raw[hi]
     mcols = [(j, str(hdr[j])) for j in range(5, 11) if hdr[j] and str(hdr[j]) != "—"]
@@ -196,14 +216,17 @@ for ws in wb.worksheets:
         d = iso(r[0])
         if not d: continue
         if d > today.isoformat(): break
-        days.append({"date": d, "in": str(r[2] or ""), "out": str(r[3] or ""), "hours": num(r[4]),
+        days.append({"date": d, "in": hm(r[2]), "out": hm(r[3]), "hours": num(r[4]),
                      "m": {lab: num(r[j]) for j, lab in mcols},
-                     "main": str(r[11] or "")[:200], "problem": str(r[13] or "")[:200], "plan": str(r[14] or "")[:200],
+                     "main": str(r[11] or "")[:200], "other": str(r[12] or "")[:200], "problem": str(r[13] or "")[:200], "plan": str(r[14] or "")[:200],
                      "report": str(r[15] or ""), "score": num(r[16]), "missed": num(r[17])})
     people.append({"name": name, "role": role, "metrics": [lab for _, lab in mcols],
                    "reports": num(summ[1]), "missed": num(summ[3]), "fine": num(summ[5]),
                    "hours": num(summ[7]), "avg_hours": num(summ[9]), "score": num(summ[11]), "days": days})
-put("sales_team", "staff", {"asof": NOW, "month": iso(raw[1][5]) if False else today.strftime("%Y-%m"), "people": people})
+staff_doc = {"asof": NOW, "month": show_month or today.strftime("%Y-%m"), "office": office, "people": people}
+put("sales_team", "staff", staff_doc)
+# one doc per month too, so earlier months stay visible after the sheet moves on
+put("sales_team", "staff_" + staff_doc["month"], dict(staff_doc))
 
 # ---------- 4. Old sheets: Call System v6 + old Up-sales Tracker (merge) ----------
 if len(sys.argv) > 6:

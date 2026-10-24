@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { formatReply } from '@/lib/inbox/format';
+import { banglaPrices, formatReply } from '@/lib/inbox/format';
 import { systemPrompt } from '@/lib/inbox/ai';
 import { productBlock } from '@/lib/inbox/products';
 
@@ -13,6 +13,10 @@ describe('reply layout', () => {
   it('puts a blank line between a paragraph and a list and the closing question; one item per line', () => {
     const out = formatReply('জি আপু, আছে।\n• ২৫০ গ্রাম — ৳৩৫০\n• ৫০০ গ্রাম — ৳৭০০\nকোনটা নেবেন আপু?');
     expect(out).toBe('জি আপু, আছে।\n\n• ২৫০ গ্রাম — ৳৩৫০\n• ৫০০ গ্রাম — ৳৭০০\n\nকোনটা নেবেন আপু?');
+  });
+  it('prices are always in Bangla digits; phone numbers and links are not touched', () => {
+    expect(banglaPrices('২৫০ গ্রাম — ৳280, ১ কেজি ৳1,200, ৳ 99.50, ফোন 01712345678')).toBe('২৫০ গ্রাম — ৳২৮০, ১ কেজি ৳১,২০০, ৳৯৯.৫০, ফোন 01712345678');
+    expect(formatReply('দাম ৳650 আপু')).toBe('দাম ৳৬৫০ আপু');
   });
   it('keeps already good layout, removes markdown and extra blank lines', () => {
     expect(formatReply('**জি আপু**\n\n\n\nধন্যবাদ')).toBe('জি আপু\n\nধন্যবাদ');

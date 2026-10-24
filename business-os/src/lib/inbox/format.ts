@@ -2,8 +2,12 @@
 // no markdown. The model is told to do this, and this guarantees it (a wall of text is hard to read on a phone).
 const BULLET = /^\s*(?:[•\-–*]|[০-৯0-9]+[।.)])\s*/;
 
+const BN_DIGIT = '০১২৩৪৫৬৭৮৯';
+/** ৳280 / ৳1,200 -> ৳২৮০ / ৳১,২০০: prices always in Bangla digits (phone numbers and links are left alone). */
+export const banglaPrices = (t: string) => t.replace(/৳\s?(\d[\d,]*(?:\.\d+)?)/g, (_, n: string) => '৳' + n.replace(/\d/g, (d) => BN_DIGIT[Number(d)]));
+
 export function formatReply(input: string): string {
-  let t = String(input ?? '').replace(/\r/g, '').replace(/\*\*|__|`/g, '').replace(/^#{1,6}\s*/gm, '').trim();
+  let t = banglaPrices(String(input ?? '')).replace(/\r/g, '').replace(/\*\*|__|`/g, '').replace(/^#{1,6}\s*/gm, '').trim();
   if (!t) return '';
   let lines = t.split('\n').map((l) => l.replace(/[ \t]+/g, ' ').trim());
   // one long block: split it into sentences, two per paragraph

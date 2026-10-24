@@ -3,7 +3,7 @@ const KB_STOP = new Set('the and for you your are with that this from have will 
 export const kbTok = (s: unknown) => (String(s || '').toLowerCase().match(/[a-z0-9ঀ-৿]{2,}/g) || []).filter((w) => !KB_STOP.has(w));
 
 type Row = { id: string; title: string; src: string; pages: string; text: string; kind: 'course' | 'note'; business?: string };
-export type Hit = { score: number; source: string; file: string; pages: string; kind: string; text: string };
+export type Hit = { id: string; score: number; source: string; file: string; pages: string; kind: string; text: string };
 export type KbIndex = { items: { r: Row; tf: Map<string, number>; len: number }[]; df: Map<string, number>; N: number; avg: number };
 
 export function buildIndex(chunkDocs: { id: string; data: Record<string, any> }[], notes: { id: string; data: Record<string, any> }[]): KbIndex {
@@ -35,5 +35,5 @@ export function kbSearch(KB: KbIndex, q: string, n = 6, biz?: string): Hit[] {
     .filter((x) => x.s > 0)
     .sort((a, b) => b.s - a.s)
     .slice(0, n)
-    .map(({ it, s }) => ({ score: +s.toFixed(2), source: it.r.title, file: it.r.src, pages: it.r.pages, kind: it.r.kind, text: it.r.text }));
+    .map(({ it, s }) => ({ id: it.r.id, score: +s.toFixed(2), source: it.r.title, file: it.r.src, pages: it.r.pages, kind: it.r.kind, text: it.r.text }));
 }

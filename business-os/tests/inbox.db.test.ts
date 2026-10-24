@@ -62,6 +62,27 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
     expect(hist.find((x) => x.mid === 'm_in_2_' + conv)).toMatchObject({ intent: 'price', lead: 72, order: { product: 'Cerelac 1kg', qty: '1' } });
   });
 
+  it('the AI also gets the website passages and similar past TEAM replies (and old prices are marked "do not copy")', async () => {
+    const col = (await import('@/lib/db')).db().collection('inbox_web');
+    await col.doc('t_' + conv).set({ business: 'kidscare', url: 'https://kc.test/dhaka-delivery', title: 'Dhaka delivery', text: 'Zorbatzorbat delivery policy: Dhaka te 2 diner moddhe delivery', fetched: new Date().toISOString() });
+    const other = 'old_' + conv;
+    await store.saveMessage({ conv: other, channel: 'messenger', dir: 'in', by: 'customer', text: 'zorbatzorbat polisi ki', mid: 'o_in_' + conv, ts: new Date(Date.now() - 9 * 864e5).toISOString(), status: 'done', business: 'kidscare', source: 'import' });
+    await store.saveMessage({ conv: other, channel: 'messenger', dir: 'out', by: 'team', text: 'Apu zorbatzorbat er jonno Dhaka te 2 din lage, call 01712345678', mid: 'o_out_' + conv, ts: new Date(Date.now() - 9 * 864e5 + 60000).toISOString(), status: 'done', business: 'kidscare', source: 'import' });
+    (await import('@/lib/inbox/web')).invalidateWebIndex(); (await import('@/lib/inbox/learn')).invalidatePairs();
+    create.mockClear();
+    create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Apu Dhaka te 2 din ❤', intent: 'delivery', mood: 'normal', needs_human: false, lead_score: 30, order: {} }) }] });
+    const [m] = await mod.ingestWebhook(payload('m_in_ctx_' + conv, 'zorbatzorbat polisi bolen'));
+    await mod.autoReply(m, 0);
+    sent.pop(); // keep the later tests' counts as they were
+    await store.updateMessage('m_in_ctx_' + conv, { ts: new Date(Date.now() - 100 * 3600e3).toISOString() }); // it must not count as a fresh customer message in the 24 h test below
+    const sys = create.mock.calls[0][0].system[0].text as string;
+    expect(sys).toContain('https://kc.test/dhaka-delivery');
+    expect(sys).toContain('Dhaka te 2 diner moddhe delivery');
+    expect(sys).toContain('Amader uttor: Apu zorbatzorbat er jonno Dhaka te 2 din lage, call [phone]'); // phone number scrubbed
+    await prisma.$executeRaw`DELETE FROM docs WHERE collection IN ('inbox_web','inbox_messages') AND (id = ${'t_' + conv} OR data->>'conv' = ${other})`;
+    (await import('@/lib/inbox/web')).invalidateWebIndex(); (await import('@/lib/inbox/learn')).invalidatePairs();
+  });
+
   it('needs_human: no reply, conversation waits for the team', async () => {
     create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: '', intent: 'complaint', mood: 'angry', needs_human: true, lead_score: 10, order: {} }) }] });
     const [m] = await mod.ingestWebhook(payload('m_in_3_' + conv, 'product kharap!'));

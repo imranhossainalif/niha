@@ -7,6 +7,7 @@ import { sheetsSync } from './sheets';
 import { backup } from './backup';
 import { competitorWeekly, growthWeekly, learningNudge, loanPlan } from './ai_jobs';
 import { checkAll } from '../health';
+import { webSync } from '../inbox/web';
 import { publishDue, socialIdeas, socialSync } from './social';
 
 export const JOBS: Record<string, (params: any) => Promise<unknown>> = {
@@ -24,6 +25,7 @@ export const JOBS: Record<string, (params: any) => Promise<unknown>> = {
   social_publish: () => publishDue(),
   social_sync: (p) => socialSync({ days: Number(p?.days) || 90 }),
   social_ideas: (p) => socialIdeas(p?.business || 'kidscare'),
+  inbox_web_sync: () => webSync(),
   health_check: async () => { const h = await checkAll(); return { bad: h.bad, warn: h.warn }; },
 };
 

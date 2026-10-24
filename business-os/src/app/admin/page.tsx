@@ -8,8 +8,11 @@ import { sessionPrincipal } from '@/lib/session';
 import { createApiKey } from '@/lib/apikeys';
 import { BIZ, BIZ_IDS } from '@/lib/business';
 import { getConfig, saveConfig } from '@/lib/inbox/store';
-import { configStatus } from '@/lib/config';
+import { cfg, configStatus } from '@/lib/config';
 import { IntegrationsForm } from '@/components/IntegrationsForm';
+import { InboxTest } from '@/components/InboxTest';
+import { webStatus } from '@/lib/inbox/web';
+import { pairCount } from '@/lib/inbox/learn';
 import type { Role } from '@/lib/access';
 
 export const dynamic = 'force-dynamic';
@@ -33,6 +36,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     getConfig(),
   ]);
   const integrations = await configStatus();
+  const [web, pairs, siteUrl] = await Promise.all([webStatus().catch(() => ({ pages: 0, last: null as string | null })), pairCount().catch(() => 0), cfg('WEBSITE_URL')]);
 
   async function saveUser(fd: FormData) {
     'use server';
@@ -82,7 +86,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     'use server';
     const p = await requireAdmin();
     const kind = String(fd.get('kind'));
-    if (!['nuport_sync', 'sheets_sync', 'inbox_import', 'backup'].includes(kind)) redirect('/admin?msg=bad');
+    if (!['nuport_sync', 'sheets_sync', 'inbox_import', 'backup', 'inbox_web_sync'].includes(kind)) redirect('/admin?msg=bad');
     await prisma.job.create({ data: { kind, params: kind === 'inbox_import' ? { days: 30 } : {}, createdBy: p.kind === 'user' ? p.email : 'admin' } });
     revalidatePath('/admin');
   }
@@ -141,6 +145,13 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           <button className="btn" type="submit">{inbox.ai_on ? 'Bondho korun' : 'Chalu korun'}</button>
           <span className="muted">Webhook URL: <code>{(process.env.PUBLIC_URL || '') + '/api/meta/webhook'}</code></span>
         </form>
+        <div className="grid gap-1 text-sm">
+          <b>AI ki ki jane</b>
+          <span>🌐 Website: {siteUrl ? <>{siteUrl} — <b>{web.pages}</b> ta page porechhe{web.last ? ' (shesh ' + web.last.slice(0, 16).replace('T', ' ') + ' UTC)' : ''}</> : <span style={{ color: '#b7791f' }}>website dewa nai — <Link className="link" href="/settings">Settings → AI knowledge</Link> e link din</span>}</span>
+          <span>💬 Purono uttor theke: <b>{pairs}</b> ta proshno-uttor jora (team er ager reply)</span>
+          <span className="muted">Dam, offer, delivery charge shudhu Dashboard er InboxPilot → Products/Offers/Delivery theke. Website ar purono uttor shudhu bujhiye bolar jonno.</span>
+        </div>
+        <InboxTest />
       </section>
 
       <section className="card grid gap-3">
@@ -153,7 +164,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
       <section className="card grid gap-2">
         <h2 className="font-semibold">Background jobs</h2>
         <form action={queueJob} className="flex flex-wrap gap-2">
-          {[['nuport_sync', 'Nuport sync ekhon'], ['sheets_sync', 'Sheets sync ekhon'], ['inbox_import', 'Messenger import (30 din)'], ['backup', 'Backup ekhon']].map(([k, l]) => (
+          {[['nuport_sync', 'Nuport sync ekhon'], ['inbox_web_sync', 'Website abar porun (AI er jonno)'], ['sheets_sync', 'Sheets sync ekhon'], ['inbox_import', 'Messenger import (30 din)'], ['backup', 'Backup ekhon']].map(([k, l]) => (
             <button key={k} className="btn" name="kind" value={k} type="submit">{l}</button>
           ))}
         </form>

@@ -35,13 +35,18 @@ const SCHEMA = {
   },
 } as const;
 
-export function systemPrompt(agentName: string, kb: string, rules: string): string {
+export type Extras = { web?: { title: string; url: string; text: string }[]; past?: { q: string; a: string }[] };
+
+export function systemPrompt(agentName: string, kb: string, rules: string, extras: Extras = {}): string {
+  const web = (extras.web ?? []).map((h) => '# ' + h.title + ' (' + h.url + ')\n' + h.text).join('\n\n');
+  const past = (extras.past ?? []).map((p, i) => (i + 1) + '. Customer: ' + p.q + '\n   Amader uttor: ' + p.a).join('\n');
   return `You are "${agentName}", the Messenger sales assistant of Kids Care BD (homemade baby food, Bangladesh).
-Answer the customer's latest message using ONLY the knowledge below. Reply in the customer's language (Bangla, Banglish or English), short and polite.
+Answer the customer's latest message using ONLY the knowledge below (KNOWLEDGE, WEBSITE and PAST REPLIES). Reply in the customer's language (Bangla, Banglish or English), short and polite.
 
 NON-NEGOTIABLE:
-- Never invent a price, discount, offer, stock count or delivery charge. If it is not in the knowledge, say you will confirm and set needs_human = true.
-- Never make health, cure, disease-prevention, weight-gain or doctor claims.
+- Never invent a price, discount, offer, stock count or delivery charge. Prices, offers and delivery charges come ONLY from KNOWLEDGE (or the WEBSITE if KNOWLEDGE does not have it). If it is not there, say you will confirm and set needs_human = true.
+- PAST REPLIES show how our team answered similar questions before: copy the tone and the way of explaining. Do NOT copy a price, offer, date or stock from them (they can be out of date); if one conflicts with KNOWLEDGE or WEBSITE, KNOWLEDGE wins.
+- Never make health, cure, disease-prevention, weight-gain or doctor claims, even if the website or a past reply does.
 - Never mention lotteries, lucky draws or raffles.
 - needs_human = true when the customer is angry, complains, asks for a refund/return, asks for a person, or you are unsure.
 - Fill "order" only with details the customer actually gave in this conversation (name, phone, address, product, qty, baby_age); empty strings otherwise.
@@ -50,7 +55,7 @@ RULES:
 ${rules}
 
 KNOWLEDGE:
-${kb}`;
+${kb}${web ? '\n\nWEBSITE (our site, the passages closest to the question):\n' + web : ''}${past ? '\n\nPAST REPLIES (our team, similar questions):\n' + past : ''}`;
 }
 
 /** Last messages → alternating user/assistant turns that start with the customer. */
@@ -82,11 +87,11 @@ export function parseDecision(text: string): AiDecision {
   };
 }
 
-export async function decide(agentName: string, kb: string, rules: string, history: InboxMessage[]): Promise<AiDecision> {
+export async function decide(agentName: string, kb: string, rules: string, history: InboxMessage[], extras: Extras = {}): Promise<AiDecision> {
   const res = await (await anthropic()).messages.create({
     model: await MODEL(),
     max_tokens: 4000,
-    system: [{ type: 'text', text: systemPrompt(agentName, kb, rules), cache_control: { type: 'ephemeral' } }],
+    system: [{ type: 'text', text: systemPrompt(agentName, kb, rules, extras), cache_control: { type: 'ephemeral' } }],
     messages: toTurns(history),
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   } as Anthropic.MessageCreateParamsNonStreaming);

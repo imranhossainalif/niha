@@ -63,6 +63,11 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   direct post) log in through `/api/social/oauth/[provider]/start|callback`; tokens via `saveSecret('oauth:<account>')` (encrypted,
   never in docs), refreshed by `oauth.getAccess`. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
   `/legal/privacy` and `/legal/terms` exist because TikTok/Google ask for them.
+- **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
+  the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,
+  BM25 lookup) and the most similar past customer→TEAM reply pairs (`learn.ts`, built from `inbox_messages`, phones scrubbed, 15 min cache).
+  Prompt rule: prices/offers/delivery only from KNOWLEDGE (or website); past replies are for tone, never for numbers. Admin → InboxPilot has
+  a status line and an "AI test" box (`/api/inbox/test`, sends nothing).
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations
   (`app_settings`, AES-256-GCM with a key from AUTH_SECRET, 30 s cache). Use it for every integration key; never read
   those from `process.env` directly. The worker checks keys at run time, so saving in Admin needs no restart.

@@ -2,6 +2,7 @@
 import { getPath, getUrl, profileName, sendText } from '../meta/graph';
 import { cfg } from '../config';
 import { decide, hasOrder } from './ai';
+import { contextFor } from './context';
 import { BUSINESS, convMessages, getConfig, knowledgeFor, lastInbound, saveMessage, updateMessage, type Channel, type InboxMessage } from './store';
 
 const DAY = 24 * 3600 * 1000;
@@ -56,7 +57,8 @@ export async function autoReply(msg: InboxMessage, debounceMs = 4000): Promise<'
   const { kb, rules } = await knowledgeFor(cfg);
   let d;
   try {
-    d = await decide(cfg.agent_name || 'Kids Care Assistant', kb, rules, history);
+    const { extras } = await contextFor(history);
+    d = await decide(cfg.agent_name || 'Kids Care Assistant', kb, rules, history, extras);
   } catch (e) {
     log('AI failed for', msg.conv, (e as Error).message);
     await updateMessage(msg.mid, { status: 'waiting', human: true });

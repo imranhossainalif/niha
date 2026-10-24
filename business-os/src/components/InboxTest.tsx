@@ -2,7 +2,7 @@
 // Admin: try the inbox AI on a made-up customer message. Same knowledge, website and past replies as the real thing; nothing is sent.
 import { useState } from 'react';
 
-type Res = { decision: { reply: string; intent: string; mood: string; needs_human: boolean; lead_score: number; order: Record<string, string> }; used: { products?: { name: string; variants: { label: string; price: number }[]; url: string }[]; web: { title: string; url: string; text: string }[]; past: { q: string; a: string }[] } };
+type Res = { keywords?: string; decision: { reply: string; intent: string; mood: string; needs_human: boolean; note?: string; lead_score: number; order: Record<string, string> }; used: { products?: { name: string; variants: { label: string; price: number }[]; url: string }[]; web: { title: string; url: string; text: string }[]; past: { q: string; a: string }[] } };
 
 export function InboxTest() {
   const [text, setText] = useState('');
@@ -30,6 +30,8 @@ export function InboxTest() {
         {res && (
           <div className="grid gap-1">
             <span>Intent: <b>{res.decision.intent}</b> · mood: <b>{res.decision.mood}</b> · lead: <b>{res.decision.lead_score}</b> · {res.decision.needs_human ? <b style={{ color: '#d99a1e' }}>manush ke dite hobe (AI nijer theke pathabe na)</b> : <b style={{ color: '#1f9d6b' }}>AI nijei pathabe</b>}</span>
+            {res.decision.note && <span className="muted" style={{ fontSize: 12 }}>Kno team lagbe: {res.decision.note}</span>}
+            {res.keywords && <span className="muted" style={{ fontSize: 12 }}>Khujar shobdo: {res.keywords}</span>}
             {Object.values(res.decision.order).some(Boolean) && <span>Order e pelo: {Object.entries(res.decision.order).filter(([, v]) => v).map(([k, v]) => k + ': ' + v).join(' · ')}</span>}
             <b className="mt-1">Shop product theke dekhlo ({res.used.products?.length ?? 0})</b>
             {(res.used.products ?? []).map((p, i) => <span key={i} className="muted" style={{ fontSize: 12 }}>• {p.name}: {p.variants.map((v) => (v.label ? v.label + ' ' : '') + '৳' + v.price).join(' · ')}</span>)}

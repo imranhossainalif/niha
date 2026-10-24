@@ -11,6 +11,7 @@ export type AiDecision = {
   intent: (typeof INTENTS)[number];
   mood: (typeof MOODS)[number];
   needs_human: boolean;
+  note: string; // one short sentence: why the team is needed (empty when not)
   lead_score: number;
   order: Order;
 };
@@ -19,12 +20,13 @@ const ORDER_KEYS = ['name', 'phone', 'address', 'product', 'qty', 'baby_age'] as
 const SCHEMA = {
   type: 'object',
   additionalProperties: false,
-  required: ['reply', 'intent', 'mood', 'needs_human', 'lead_score', 'order'],
+  required: ['reply', 'intent', 'mood', 'needs_human', 'note', 'lead_score', 'order'],
   properties: {
     reply: { type: 'string', description: 'Message to send the customer. Empty if needs_human is true and nothing safe can be said.' },
     intent: { type: 'string', enum: [...INTENTS] },
     mood: { type: 'string', enum: [...MOODS] },
     needs_human: { type: 'boolean' },
+    note: { type: 'string', description: 'If needs_human: one short sentence in English on why (e.g. "price of Rajma Khichuri not in knowledge"). Otherwise empty.' },
     lead_score: { type: 'integer', description: '0-100: how likely this customer orders soon' },
     order: {
       type: 'object',
@@ -57,7 +59,7 @@ NON-NEGOTIABLE:
 - PAST REPLIES show how our team answered similar questions before: copy the tone and the way of explaining. Do NOT copy a price, offer, date or stock from them (they can be out of date); if one conflicts with KNOWLEDGE or WEBSITE, KNOWLEDGE wins.
 - Never make health, cure, disease-prevention, weight-gain or doctor claims, even if the website or a past reply does.
 - Never mention lotteries, lucky draws or raffles.
-- needs_human = true when the customer is angry, complains, asks for a refund/return, asks for a person, or you are unsure.
+- needs_human = true when the customer is angry, complains, asks for a refund/return, asks for a person, or you are unsure. When the customer asked something normal and you only lack one detail (a price, a size, stock), STILL write a short helpful reply that answers what you do know and says the team will confirm the rest, and set needs_human = true so the team follows up; the customer must never be left without any reply. Leave reply empty only for an angry customer, a complaint, a refund or when you truly cannot say anything safe.
 - Fill "order" only with details the customer actually gave in this conversation (name, phone, address, product, qty, baby_age); empty strings otherwise.
 
 RULES:
@@ -91,6 +93,7 @@ export function parseDecision(text: string): AiDecision {
     intent: INTENTS.includes(raw.intent) ? raw.intent : 'other',
     mood: MOODS.includes(raw.mood) ? raw.mood : 'normal',
     needs_human: raw.needs_human === true || !String(raw.reply ?? '').trim(),
+    note: String(raw.note ?? '').slice(0, 200),
     lead_score: Math.max(0, Math.min(100, Math.round(Number(raw.lead_score) || 0))),
     order,
   };
@@ -105,7 +108,7 @@ export async function decide(agentName: string, kb: string, rules: string, histo
     output_config: { format: { type: 'json_schema', schema: SCHEMA } },
   } as Anthropic.MessageCreateParamsNonStreaming);
   void recordUsage(String(res.model), res.usage).catch(() => {});
-  if (res.stop_reason === 'refusal') return { reply: '', intent: 'other', mood: 'normal', needs_human: true, lead_score: 0, order: {} };
+  if (res.stop_reason === 'refusal') return { reply: '', intent: 'other', mood: 'normal', needs_human: true, note: 'model refused', lead_score: 0, order: {} };
   const text = res.content.filter((b): b is Anthropic.TextBlock => b.type === 'text').map((b) => b.text).join('');
   return parseDecision(text);
 }

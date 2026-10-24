@@ -19,5 +19,5 @@ export const POST = handle(async (req: Request) => {
   const { kb, rules } = await knowledgeFor(cfg);
   const ctx = await contextFor(history);
   const decision = await decide(cfg.agent_name || 'Kids Care Assistant', kb, rules, history, ctx.extras);
-  return json({ decision, used: { products: ctx.products.map((p) => ({ name: p.name, variants: p.variants.map((v) => ({ label: v.label, price: v.price })), url: p.url })), web: ctx.web.map((h) => ({ title: h.title, url: h.url, text: h.text.slice(0, 300) })), past: ctx.past } });
+  return json({ decision, keywords: ctx.keywords, used: { products: ctx.products.map((p) => ({ name: p.name, variants: p.variants.map((v) => ({ label: v.label, price: v.price })), url: p.url })), web: ctx.web.map((h) => ({ title: h.title, url: h.url, text: h.text.slice(0, 300) })), past: ctx.past } });
 });

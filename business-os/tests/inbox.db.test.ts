@@ -91,6 +91,23 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
     expect((await store.lastInbound(conv))).toMatchObject({ status: 'waiting', human: true, mood: 'angry' });
   });
 
+  it('a holding reply ("we have it, the team will confirm the price") is sent AND the chat stays flagged for the team; an angry customer gets no automatic reply', async () => {
+    create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Ji apu Khichuri ache, dam team confirm korbe', intent: 'product_info', mood: 'normal', needs_human: true, note: 'khichuri price not in knowledge', lead_score: 40, order: {} }) }] });
+    const [m] = await mod.ingestWebhook(payload('m_in_hold_' + conv, 'khichuri hobe?'));
+    const before = sent.length;
+    expect(await mod.autoReply(m, 0)).toBe('waiting');
+    expect(sent).toHaveLength(before + 1);
+    expect(sent.at(-1).message.text).toBe('Ji apu Khichuri ache, dam team confirm korbe');
+    expect(await store.lastInbound(conv)).toMatchObject({ status: 'waiting', human: true, ai_why: 'khichuri price not in knowledge' });
+    sent.pop();
+
+    create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Sorry apu', intent: 'complaint', mood: 'angry', needs_human: true, note: 'angry', lead_score: 5, order: {} }) }] });
+    const [a2] = await mod.ingestWebhook(payload('m_in_angry_' + conv, 'khub kharap service!!'));
+    expect(await mod.autoReply(a2, 0)).toBe('waiting');
+    expect(sent).toHaveLength(before); // nothing went out
+    for (const mid of ['m_in_hold_', 'm_in_angry_']) await store.updateMessage(mid + conv, { ts: new Date(Date.now() - 100 * 3600e3).toISOString() }); // not "fresh" for the 24 h test below
+  });
+
   it('team reply inside 24h is sent and clears waiting; outside 24h is refused', async () => {
     await mod.teamSend(conv, 'Sorry apu, ekhoni dekhchi');
     expect(sent[1].message.text).toBe('Sorry apu, ekhoni dekhchi');

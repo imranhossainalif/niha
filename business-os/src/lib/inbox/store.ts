@@ -17,6 +17,7 @@ export type InboxMessage = {
   human?: boolean;
   lead?: number;
   order?: Order | null;
+  ai_why?: string; // why the AI wanted the team (shown when a chat is left waiting)
   status: 'open' | 'waiting' | 'done';
   name?: string;
   business: string;

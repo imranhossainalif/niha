@@ -52,6 +52,23 @@ describe.skipIf(!HAS_DB)('files + catalogue for the inbox AI', () => {
     expect((await files.listFiles()).find((f) => f.id === up.id)).toMatchObject({ status: 'error', error: expect.stringContaining('password') });
   });
 
+  it('Banglish question finds a product named in Bangla script (an AI step turns the message into keywords in both scripts)', async () => {
+    await prod.saveProducts(tag, [{ name: 'রাজমা খিচুড়ি মিক্স', url: 'https://shop.test/k', currency: 'BDT', source: 'woocommerce', variants: [{ label: '২৫০ গ্রাম', price: 320 }, { label: '৫০০ গ্রাম', price: 620 }] }]);
+    process.env.INBOX_QUERY_EXPAND = 'off';
+    expect((await ctx.contextFor([{ dir: 'in', text: 'khichuri hbe' }])).products).toHaveLength(0); // words do not overlap across scripts
+    delete process.env.INBOX_QUERY_EXPAND;
+    create.mockResolvedValueOnce({ model: 'test-model', usage: {}, content: [{ type: 'text', text: 'খিচুড়ি, khichuri khichdi!' }] });
+    const c = await ctx.contextFor([{ dir: 'in', text: 'khichuri hbe' }]);
+    process.env.INBOX_QUERY_EXPAND = 'off';
+    expect(c.keywords).toBe('খিচুড়ি khichuri khichdi');
+    expect(create.mock.calls.at(-1)![0].messages[0].content).toBe('khichuri hbe');
+    expect(c.extras.products).toEqual(['• রাজমা খিচুড়ি মিক্স: ২৫০ গ্রাম ৳320; ৫০০ গ্রাম ৳620 — https://shop.test/k']);
+    // a failing keyword step must not break the reply
+    delete process.env.INBOX_QUERY_EXPAND; create.mockRejectedValueOnce(new Error('overloaded'));
+    expect((await ctx.contextFor([{ dir: 'in', text: 'unique-question-xyz' }])).keywords).toBe('');
+    process.env.INBOX_QUERY_EXPAND = 'off';
+  });
+
   it('shop catalogue: the question finds the product with ALL its variations; "price list" gives the list; unknown gives nothing', async () => {
     await prod.saveProducts(tag, [
       { name: 'Quxwvu Cerelac', url: 'https://shop.test/q', currency: 'BDT', source: 'shopify', variants: [{ label: '500g', price: 700 }, { label: '1kg', price: 1200 }] },

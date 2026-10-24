@@ -65,8 +65,11 @@ export async function autoReply(msg: InboxMessage, debounceMs = 4000): Promise<'
     return 'waiting';
   }
   const order = hasOrder(d.order) ? d.order : null;
-  await updateMessage(msg.mid, { intent: d.intent, mood: d.mood, lead: d.lead_score, human: d.needs_human, order, status: d.needs_human ? 'waiting' : 'open' });
-  if (d.needs_human || !d.reply.trim()) return 'waiting';
+  await updateMessage(msg.mid, { intent: d.intent, mood: d.mood, lead: d.lead_score, human: d.needs_human, order, status: d.needs_human ? 'waiting' : 'open', ...(d.note ? { ai_why: d.note } : {}) });
+  // a holding reply ("we have it, the team will confirm the price") still goes out and the chat stays flagged for the team;
+  // an angry customer or a complaint is left to a person
+  const personal = d.mood === 'angry' || d.intent === 'complaint';
+  if (!d.reply.trim() || (d.needs_human && personal)) return 'waiting';
 
   try {
     const ids = await sendText(msg.conv, d.reply);
@@ -74,7 +77,7 @@ export async function autoReply(msg: InboxMessage, debounceMs = 4000): Promise<'
       conv: msg.conv, channel: msg.channel, dir: 'out', by: 'ai', text: d.reply, mid: ids[0] || 'ai_' + msg.mid,
       ts: new Date().toISOString(), status: 'open', business: msg.business, intent: d.intent, order, lead: d.lead_score, source: 'webhook',
     });
-    return 'sent';
+    return d.needs_human ? 'waiting' : 'sent'; // the chat stays in the team's "waiting" list when they must follow up
   } catch (e) {
     log('send failed', msg.conv, (e as Error).message);
     await updateMessage(msg.mid, { status: 'waiting', human: true });

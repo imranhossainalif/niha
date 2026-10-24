@@ -36,6 +36,8 @@ export function shopifyProducts(list: any[], origin: string, currency = 'BDT'): 
 
 /* ---- WooCommerce Store API ---- */
 const wooMoney = (prices: any, key: string) => { const n = num(prices?.[key]); const minor = Number(prices?.currency_minor_unit ?? 2); return Number.isFinite(n) ? n / 10 ** minor : NaN; };
+/** Woo gives an attribute value as its slug ("%e0%a7%a8...-%e0%a6%97..." for "২৫০ গ্রাম"): turn it back into words. */
+export const unslug = (v: unknown) => { let t = String(v ?? ''); try { t = decodeURIComponent(t); } catch { /* keep as is */ } return clean(t.replace(/-/g, ' '), 80); };
 /** "Size: 500g, Flavor: Rose" -> "500g / Rose" */
 const variationText = (s: unknown) => clean(s, 160).split(/,\s*(?=[^,:]+:)/).map((x) => x.replace(/^[^:]*:\s*/, '').trim()).filter(Boolean).join(' / ');
 export function wooProducts(list: any[], variationsOf: Record<string, any[]> = {}): WebProduct[] {
@@ -44,10 +46,13 @@ export function wooProducts(list: any[], variationsOf: Record<string, any[]> = {
     const cur = p.prices?.currency_code || 'BDT';
     const vars = variationsOf[String(p.id)] ?? [];
     // the parent lists each variation's attributes (id + [{name, value}]); the variation itself carries a "Size: 500g" text
+    const terms: Record<string, string> = {}; // slug -> the shop's own word for it
+    for (const at of p.attributes ?? []) for (const t of at.terms ?? []) if (t.slug) terms[String(t.slug).toLowerCase()] = clean(t.name, 80);
+    const word = (v: unknown) => terms[String(v ?? '').toLowerCase()] || unslug(v);
     const named: Record<string, string> = {};
-    for (const x of p.variations ?? []) named[String(x.id)] = (x.attributes ?? []).map((a: any) => clean(a.value, 80)).filter(Boolean).join(' / ');
+    for (const x of p.variations ?? []) named[String(x.id)] = (x.attributes ?? []).map((a: any) => word(a.value)).filter(Boolean).join(' / ');
     let variants: Variant[] = vars.map((v: any) => ({
-      label: named[String(v.id)] || variationText(v.variation) || (v.attributes ?? []).map((a: any) => clean(a.value, 80)).filter(Boolean).join(' / '),
+      label: named[String(v.id)] || variationText(v.variation) || (v.attributes ?? []).map((a: any) => word(a.value)).filter(Boolean).join(' / '),
       price: wooMoney(v.prices, 'price'), regular: wooMoney(v.prices, 'regular_price') || undefined, available: v.is_in_stock,
     })).filter((v) => Number.isFinite(v.price));
     if (!variants.length) {

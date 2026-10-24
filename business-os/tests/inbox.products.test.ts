@@ -28,6 +28,14 @@ describe('catalogue from a shop website', () => {
     expect(p[0].name).toBe('Pur Bottle – 1102');
     expect(p[0].variants.map((v) => [v.label, v.price])).toEqual([['250g', 350], ['1kg / Rose', 1200]]);
   });
+  it('WooCommerce: attribute values that are URL slugs become the shop\'s words (terms list) or decoded text', () => {
+    const slug250 = encodeURIComponent('২৫০-গ্রাম').toLowerCase();
+    const p = wooProducts([{ id: 9, name: 'সেরেলাক', permalink: 'https://w.test/c', type: 'variable', is_in_stock: true, prices: { price: '35000', currency_minor_unit: 2, currency_code: 'BDT' },
+      attributes: [{ name: 'ওজন', terms: [{ name: '২৫০ গ্রাম', slug: slug250 }] }],
+      variations: [{ id: 91, attributes: [{ name: 'ওজন', value: slug250 }] }, { id: 92, attributes: [{ name: 'ওজন', value: encodeURIComponent('৫০০-গ্রাম').toLowerCase() }] }] }],
+      { '9': [{ id: 91, prices: { price: '35000', currency_minor_unit: 2 }, is_in_stock: true }, { id: 92, prices: { price: '70000', currency_minor_unit: 2 }, is_in_stock: true }] });
+    expect(p[0].variants.map((v) => v.label)).toEqual(['২৫০ গ্রাম', '৫০০ গ্রাম']);
+  });
   it('JSON-LD: a product with an offer, and a ProductGroup with variants', () => {
     const html = `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': [
       { '@type': 'Product', name: 'Honey Mix', url: 'https://j.test/honey', offers: { '@type': 'Offer', price: '450', priceCurrency: 'BDT', availability: 'https://schema.org/InStock' } },

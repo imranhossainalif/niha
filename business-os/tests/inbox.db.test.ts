@@ -55,12 +55,12 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
     create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Apu 1kg ৳1,200 🙂', intent: 'price', mood: 'happy', needs_human: false, lead_score: 72, order: { name: '', phone: '', address: '', product: 'Cerelac 1kg', qty: '1', baby_age: '' } }) }] });
     const [m] = await mod.ingestWebhook(payload('m_in_2_' + conv, 'cerelac 1 ta nibo'));
     expect(await mod.autoReply(m, 0)).toBe('sent');
-    expect(sent[0]).toMatchObject({ recipient: { id: conv }, messaging_type: 'RESPONSE', message: { text: 'Apu 1kg ৳1,200 🙂' } });
+    expect(sent[0]).toMatchObject({ recipient: { id: conv }, messaging_type: 'RESPONSE', message: { text: 'Apu 1kg ৳১,২০০ 🙂' } }); // prices go out in Bangla digits
     const req = create.mock.calls[0][0];
     expect(req.system[0].text).toContain('Cerelac 1kg ৳1,200');
     expect(req.messages.at(-1)).toMatchObject({ role: 'user' });
     const hist = await store.convMessages(conv, 10);
-    expect(hist.at(-1)).toMatchObject({ dir: 'out', by: 'ai', text: 'Apu 1kg ৳1,200 🙂' });
+    expect(hist.at(-1)).toMatchObject({ dir: 'out', by: 'ai', text: 'Apu 1kg ৳১,২০০ 🙂' });
     expect(hist.find((x) => x.mid === 'm_in_2_' + conv)).toMatchObject({ intent: 'price', lead: 72, order: { product: 'Cerelac 1kg', qty: '1' } });
   });
 

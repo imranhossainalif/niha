@@ -57,6 +57,13 @@ describe('prompt', () => {
     expect(p).toMatch(/Do NOT copy a price, offer, date or stock/);
     expect(systemPrompt('Bot', 'K', 'R')).not.toContain('WEBSITE (our site');
   });
+  it('tells the AI to answer in Bangla script, organised, even if the saved rules say otherwise', () => {
+    const p = systemPrompt('Bot', 'K', 'Bangla/Banglish/English — customer je bhashay likhe sei bhashay');
+    expect(p).toContain('proper Bangla script');
+    expect(p).toContain('Never reply in Banglish');
+    expect(p).toContain('this overrides anything in RULES');
+    expect(p.indexOf('LANGUAGE AND LAYOUT')).toBeLessThan(p.indexOf('RULES:'));
+  });
   it('the lookup text is the last 3 customer messages, so a bare "ok" still has its question', () => {
     expect(queryFrom([{ dir: 'in', text: 'cerelac dam' }, { dir: 'out', text: 'x' }, { dir: 'in', text: '8 mash' }, { dir: 'in', text: 'ok' }])).toBe('cerelac dam 8 mash ok');
   });

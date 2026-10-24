@@ -7,7 +7,7 @@ export type KnowledgeInput = { products: R[]; offers: R[]; couriers: R[]; kb: R[
 // Form selects store 'true'/'false' strings; missing = on.
 export const ibBool = (x: unknown) => !(x === false || x === 'false');
 
-export const IB_RULES_DEFAULT = 'Bangla/Banglish/English — customer je bhashay likhe sei bhashay, chhoto kore, bhadro bhabe ("apu/bhaiya"). Shudhu knowledge e deya dam/offer bolbe, nijer theke dam ba discount banabe na. Stock er sonkhya bolbe na. Kono rog sarano, ojon barano ba daktari claim korbe na. Order hole nam, phone, thikana, product, poriman, babyr boyosh niye nibe. Customer raag korle, complaint korle, refund chaile ba "manush er sathe kotha bolbo" bolle needs_human = true. Lottery/draw er kotha bolbe na.';
+export const IB_RULES_DEFAULT = 'Bangla hoyfe uttor dibe (bangla okkhore), customer Banglish likhleo; shudhu English likhle English e. Chhoto kore, bhadro bhabe ("apu/bhaiya"), gochano bhabe. Shudhu knowledge e deya dam/offer bolbe, nijer theke dam ba discount banabe na. Stock er sonkhya bolbe na. Kono rog sarano, ojon barano ba daktari claim korbe na. Order hole nam, phone, thikana, product, poriman, babyr boyosh niye nibe. Customer raag korle, complaint korle, refund chaile ba "manush er sathe kotha bolbo" bolle needs_human = true. Lottery/draw er kotha bolbe na.';
 
 export function ibCompile(k: KnowledgeInput, today = bdToday()): string {
   const P = k.products.filter((p) => ibBool(p.active));

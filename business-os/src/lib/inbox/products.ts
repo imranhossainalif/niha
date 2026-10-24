@@ -4,7 +4,7 @@
 import { createHash } from 'node:crypto';
 import { db } from '../db';
 import { prisma } from '../prisma';
-import { assertPublicUrl } from '../web/extract';
+import { assertPublicUrl, decodeEntities } from '../web/extract';
 import { buildIndex, kbSearch, type KbIndex } from '../kb/bm25';
 import { BUSINESS } from './store';
 
@@ -14,7 +14,7 @@ export type WebProduct = { name: string; url: string; category?: string; descrip
 const SYMBOL: Record<string, string> = { BDT: '৳', TK: '৳', USD: '$', INR: '₹', EUR: '€', GBP: '£' };
 export const money = (n: number, cur = 'BDT') => (SYMBOL[cur.toUpperCase()] ?? cur + ' ') + n.toLocaleString('en-IN', { maximumFractionDigits: 2 });
 const num = (v: unknown) => { const n = Number(String(v ?? '').replace(/[^0-9.\-]/g, '')); return Number.isFinite(n) ? n : NaN; };
-const clean = (s: unknown, max = 300) => String(s ?? '').replace(/<[^>]+>/g, ' ').replace(/&nbsp;|&amp;/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+const clean = (s: unknown, max = 300) => decodeEntities(String(s ?? '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim().slice(0, max);
 
 async function getJson(url: string): Promise<{ json: any; headers: Headers } | null> {
   try {
@@ -36,17 +36,25 @@ export function shopifyProducts(list: any[], origin: string, currency = 'BDT'): 
 
 /* ---- WooCommerce Store API ---- */
 const wooMoney = (prices: any, key: string) => { const n = num(prices?.[key]); const minor = Number(prices?.currency_minor_unit ?? 2); return Number.isFinite(n) ? n / 10 ** minor : NaN; };
+/** "Size: 500g, Flavor: Rose" -> "500g / Rose" */
+const variationText = (s: unknown) => clean(s, 160).split(/,\s*(?=[^,:]+:)/).map((x) => x.replace(/^[^:]*:\s*/, '').trim()).filter(Boolean).join(' / ');
 export function wooProducts(list: any[], variationsOf: Record<string, any[]> = {}): WebProduct[] {
   const out: WebProduct[] = [];
   for (const p of list) {
     const cur = p.prices?.currency_code || 'BDT';
     const vars = variationsOf[String(p.id)] ?? [];
-    let variants: Variant[] = vars.map((v: any) => ({ label: (v.attributes ?? []).map((a: any) => a.value).filter(Boolean).join(' / '), price: wooMoney(v.prices, 'price'), regular: wooMoney(v.prices, 'regular_price') || undefined, available: v.is_in_stock })).filter((v) => Number.isFinite(v.price));
+    // the parent lists each variation's attributes (id + [{name, value}]); the variation itself carries a "Size: 500g" text
+    const named: Record<string, string> = {};
+    for (const x of p.variations ?? []) named[String(x.id)] = (x.attributes ?? []).map((a: any) => clean(a.value, 80)).filter(Boolean).join(' / ');
+    let variants: Variant[] = vars.map((v: any) => ({
+      label: named[String(v.id)] || variationText(v.variation) || (v.attributes ?? []).map((a: any) => clean(a.value, 80)).filter(Boolean).join(' / '),
+      price: wooMoney(v.prices, 'price'), regular: wooMoney(v.prices, 'regular_price') || undefined, available: v.is_in_stock,
+    })).filter((v) => Number.isFinite(v.price));
     if (!variants.length) {
       const lo = wooMoney(p.prices, 'price'), hi = num(p.prices?.price_range?.max_amount) / 10 ** Number(p.prices?.currency_minor_unit ?? 2);
       if (Number.isFinite(lo)) variants = [{ label: Number.isFinite(hi) && hi > lo ? 'dam ' + lo + ' theke ' + hi + ' porjonto (variation onujayi)' : '', price: lo, regular: wooMoney(p.prices, 'regular_price') || undefined, available: p.is_in_stock }];
     }
-    if (p.name && variants.length) out.push({ name: clean(p.name, 200), url: p.permalink, category: (p.categories ?? []).map((c: any) => c.name).join(', ') || undefined, description: clean(p.short_description || p.description), currency: cur, variants, available: p.is_in_stock, source: 'woocommerce' });
+    if (p.name && variants.length) out.push({ name: clean(p.name, 200), url: p.permalink, category: (p.categories ?? []).map((c: any) => clean(c.name, 60)).join(', ') || undefined, description: clean(p.short_description || p.description), currency: cur, variants, available: p.is_in_stock, source: 'woocommerce' });
   }
   return out;
 }

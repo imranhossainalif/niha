@@ -21,6 +21,13 @@ describe('catalogue from a shop website', () => {
     expect(p[0].category).toBe('Baby food');
     expect(productLine(p[1])).toContain('dam 300 theke 450 porjonto');
   });
+  it('WooCommerce: the variation name comes from the parent list or the variation text; entities are decoded', () => {
+    const p = wooProducts([
+      { id: 5, name: 'Pur Bottle &#8211; 1102', permalink: 'https://w.test/b', type: 'variable', is_in_stock: true, prices: { price: '40000', currency_minor_unit: 2, currency_code: 'BDT' }, variations: [{ id: 51, attributes: [{ name: 'Weight', value: '250g' }] }, { id: 52, attributes: [] }] },
+    ], { '5': [{ id: 51, prices: { price: '35000', currency_minor_unit: 2 }, is_in_stock: true, attributes: [] }, { id: 52, variation: '<span>Weight</span>: 1kg, Flavor: Rose', prices: { price: '120000', currency_minor_unit: 2 }, is_in_stock: true }] });
+    expect(p[0].name).toBe('Pur Bottle – 1102');
+    expect(p[0].variants.map((v) => [v.label, v.price])).toEqual([['250g', 350], ['1kg / Rose', 1200]]);
+  });
   it('JSON-LD: a product with an offer, and a ProductGroup with variants', () => {
     const html = `<script type="application/ld+json">${JSON.stringify({ '@context': 'https://schema.org', '@graph': [
       { '@type': 'Product', name: 'Honey Mix', url: 'https://j.test/honey', offers: { '@type': 'Offer', price: '450', priceCurrency: 'BDT', availability: 'https://schema.org/InStock' } },

@@ -9,7 +9,7 @@ import { cfg, envVal, isOn, type ConfigKey } from '../src/lib/config';
 
 const TZ = { timezone: 'Asia/Dhaka' };
 // long jobs that pick up where they stopped, so a restart just queues them again
-const RESUMABLE = ['nuport_backfill', 'nuport_recompute', 'nuport_refetch', 'inbox_import'];
+const RESUMABLE = ['nuport_backfill', 'nuport_recompute', 'nuport_refetch', 'inbox_import', 'inbox_file'];
 /** Run `kind` on `expr` when every key in `needs` is set (and `flag`, if given, is on). */
 const schedule = (expr: string, kind: string, needs: ConfigKey[] = [], flag?: ConfigKey, params: unknown = {}) => {
   cron.schedule(expr, async () => {
@@ -32,7 +32,7 @@ async function main() {
   schedule('50 8,13,20 * * *', 'nuport_sync', ['NUPORT_API_KEY']);
   schedule('55 8,13,20 * * *', 'sheets_sync', ['GOOGLE_SERVICE_ACCOUNT_JSON', 'KC_SHEET_CALL_LIVE']);
   if (!isOn(envVal('BACKUP_DISABLED'))) schedule('10 3 * * *', 'backup');
-  schedule('30 6 * * *', 'inbox_web_sync', ['WEBSITE_URL']); // AI re-reads the website every morning
+  schedule('30 6 * * *', 'inbox_web_sync'); // AI re-reads the website every morning
   schedule('17 * * * *', 'health_check'); // API / connection status for Settings (hourly)
   schedule('23 */3 * * *', 'social_sync'); // Facebook/Instagram posts, metrics, followers, competitors
   schedule('35 7 * * 3,6', 'social_ideas', ['ANTHROPIC_API_KEY'], undefined, { business: 'kidscare' }); // AI social plan, Wed + Sat

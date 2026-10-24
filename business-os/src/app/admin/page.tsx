@@ -8,7 +8,7 @@ import { sessionPrincipal } from '@/lib/session';
 import { createApiKey } from '@/lib/apikeys';
 import { BIZ, BIZ_IDS } from '@/lib/business';
 import { getConfig, saveConfig } from '@/lib/inbox/store';
-import { cfg, configStatus } from '@/lib/config';
+import { configStatus } from '@/lib/config';
 import { IntegrationsForm } from '@/components/IntegrationsForm';
 import { InboxTest } from '@/components/InboxTest';
 import { webStatus } from '@/lib/inbox/web';
@@ -36,7 +36,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     getConfig(),
   ]);
   const integrations = await configStatus();
-  const [web, pairs, siteUrl] = await Promise.all([webStatus().catch(() => ({ pages: 0, last: null as string | null })), pairCount().catch(() => 0), cfg('WEBSITE_URL')]);
+  const [web, pairs] = await Promise.all([webStatus().catch(() => ({ pages: 0, last: null as string | null })), pairCount().catch(() => 0)]);
 
   async function saveUser(fd: FormData) {
     'use server';
@@ -147,7 +147,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
         </form>
         <div className="grid gap-1 text-sm">
           <b>AI ki ki jane</b>
-          <span>🌐 Website: {siteUrl ? <>{siteUrl} — <b>{web.pages}</b> ta page porechhe{web.last ? ' (shesh ' + web.last.slice(0, 16).replace('T', ' ') + ' UTC)' : ''}</> : <span style={{ color: '#b7791f' }}>website dewa nai — <Link className="link" href="/settings">Settings → AI knowledge</Link> e link din</span>}</span>
+          <span>🌐 Website: {web.pages ? <><b>{web.pages}</b> ta page porechhe{web.last ? ' (shesh ' + web.last.slice(0, 16).replace('T', ' ') + ' UTC)' : ''}</> : <span style={{ color: '#b7791f' }}>website dewa nai</span>} · link, product, PDF upload: Dashboard → InboxPilot → Knowledge base</span>
           <span>💬 Purono uttor theke: <b>{pairs}</b> ta proshno-uttor jora (team er ager reply)</span>
           <span className="muted">Dam, offer, delivery charge shudhu Dashboard er InboxPilot → Products/Offers/Delivery theke. Website ar purono uttor shudhu bujhiye bolar jonno.</span>
         </div>

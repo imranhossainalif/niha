@@ -250,6 +250,66 @@
       var mins = Math.floor(left * 60);
       return '⏱ Reply window: ar ' + (mins >= 60 ? Math.floor(mins / 60) + ' ghonta ' : '') + (mins % 60) + ' minute (Meta 24h policy).';
     },
+    /* InboxPilot → Knowledge: the two websites (pages + products) and uploaded files (PDF/TXT/CSV) the AI reads.
+       The dashboard re-draws often, so state lives out here (typed links and the last answer survive a re-draw). */
+    sourcesCard: function () {
+      var st = (window.__bosSrc = window.__bosSrc || { data: null, draft: null, msg: '', busy: '', timer: 0 });
+      var box = document.createElement('section'); box.className = 'card';
+      var $ = function (tag, attrs, kids) { var e = document.createElement(tag); for (var k in (attrs || {})) { if (k === 'style') e.style.cssText = attrs[k]; else if (k === 'text') e.textContent = attrs[k]; else e.setAttribute(k, attrs[k]); } (kids || []).forEach(function (c) { if (c != null) e.append(c); }); return e; };
+      var ago = function (iso) { if (!iso) return 'ekhono na'; var m = Math.round((Date.now() - Date.parse(iso)) / 60000); return m < 1 ? 'ekhoni' : m < 60 ? m + ' min age' : m < 1440 ? Math.round(m / 60) + ' ghonta age' : Math.round(m / 1440) + ' din age'; };
+      var load = function () { return api('GET', '/api/inbox/sources').then(function (d) { st.data = d; if (!st.draft) st.draft = [d.sites[0].url, d.sites[1].url]; draw(); schedule(); }).catch(function (e) { st.msg = e.message || 'Load hoyni'; draw(); }); };
+      var schedule = function () {
+        clearTimeout(st.timer);
+        var d = st.data; var working = d && (d.files.some(function (f) { return f.status === 'processing'; }) || (d.sync && /queued|claimed|running/.test(d.sync.status)));
+        if (working || st.busy) st.timer = setTimeout(function () { if (document.body.contains(box)) load(); }, 4000);
+      };
+      var upload = function (files) {
+        Array.prototype.forEach.call(files, function (f) {
+          var fd = new FormData(); fd.append('file', f); st.busy = 'upload'; st.msg = f.name + ' upload hocche…'; draw();
+          fetch('/api/inbox/files', { method: 'POST', credentials: 'same-origin', body: fd }).then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error((j && j.error && j.error.message) || 'Upload hoyni'); return j; }); })
+            .then(function () { st.msg = f.name + ' upload hoyeche — AI porche (PDF hole 1-3 min lage).'; }).catch(function (e) { st.msg = '⚠ ' + e.message; }).then(function () { st.busy = ''; load(); });
+        });
+      };
+      function draw() {
+        var d = st.data; box.replaceChildren();
+        box.append($('div', { class: 'hd' }, [$('div', {}, [$('h2', { text: 'AI ja ja porbe: website, product, PDF' }), $('p', { class: 'note', text: 'Website theke shob product, variation ar dam; PDF/file theke price list, catalogue, policy. AI uttor dibe ei shob dekhe.' })])]));
+        if (!d) { box.append($('p', { class: 'note', text: st.msg || 'Load hocche…' })); return; }
+        /* websites */
+        var inputs = [0, 1].map(function (i) {
+          var inp = $('input', { type: 'url', placeholder: i ? 'Second website / shop: https://…' : 'Prothom website: https://…', 'aria-label': i ? 'Second website' : 'Prothom website', style: 'flex:1 1 260px;min-width:0' });
+          inp.value = st.draft[i] || ''; inp.disabled = !d.canEdit; inp.addEventListener('input', function () { st.draft[i] = inp.value; }); return inp;
+        });
+        box.append($('div', { style: 'display:grid;gap:8px' }, inputs.map(function (inp, i) {
+          var site = d.sites[i];
+          return $('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [inp, site.url ? $('span', { class: 'note', text: site.pages + ' page · ' + site.products + ' product · shesh ' + ago(site.last) }) : $('span', { class: 'note', text: 'dewa nai' })]);
+        })));
+        var saveB = $('button', { class: 'btn sm', text: 'Link save korun' }); saveB.disabled = !d.canEdit || !!st.busy;
+        saveB.addEventListener('click', function () { st.busy = 'save'; api('PUT', '/api/inbox/sources', { website_1: st.draft[0] || '', website_2: st.draft[1] || '' }).then(function () { st.msg = 'Link save hoyeche. Ekhon "Ekhon porun" chapun.'; st.draft = null; }).catch(function (e) { st.msg = '⚠ ' + (e.message || 'Save hoyni'); }).then(function () { st.busy = ''; load(); }); });
+        var syncing = d.sync && /queued|claimed|running/.test(d.sync.status);
+        var syncB = $('button', { class: 'btn sm primary', text: syncing ? 'Porche…' : 'Ekhon porun (page + product)' }); syncB.disabled = !d.canEdit || syncing || !d.sites.some(function (s) { return s.url; });
+        syncB.addEventListener('click', function () { st.busy = 'sync'; api('POST', '/api/inbox/sources').then(function (r) { st.msg = r.queued ? 'Website pora shuru hoyeche — 1-3 min lagbe.' : (r.note || ''); }).catch(function (e) { st.msg = '⚠ ' + (e.message || 'Hoyni'); }).then(function () { st.busy = ''; load(); }); });
+        var res = d.sync && d.sync.result && d.sync.result.sites ? d.sync.result.sites.map(function (x) { return x.error ? '⚠ ' + x.site + ': ' + x.error : x.site + ': ' + x.pages + ' page, ' + x.products + ' product' + (x.product_source === 'none' ? ' (shop er product list pai ni — page e dam lekha thakle tobei ashe)' : ''); }).join(' · ') : '';
+        box.append($('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [saveB, syncB, $('span', { class: 'note', text: syncing ? '' : res ? 'Shesh: ' + res : d.sync && d.sync.error ? '⚠ ' + d.sync.error : '' })]));
+        /* files */
+        var fi = $('input', { type: 'file', accept: '.pdf,.txt,.md,.csv', multiple: '', hidden: '' }); fi.addEventListener('change', function () { upload(fi.files); fi.value = ''; });
+        var upB = $('button', { class: 'btn sm primary', text: '+ PDF / file upload' }); upB.disabled = !d.canEdit; upB.addEventListener('click', function () { fi.click(); });
+        var zone = $('div', { style: 'border:2px dashed var(--line);border-radius:12px;padding:12px;display:grid;gap:8px' }, [
+          $('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap' }, [upB, fi, $('span', { class: 'note', text: 'PDF (20 MB porjonto), TXT, MD, CSV · ba ekhane file tene anun' })]),
+          d.files.length ? $('div', { style: 'display:grid;gap:6px' }, d.files.map(function (f) {
+            var stt = f.status === 'ready' ? $('span', { style: 'color:var(--good);font-weight:600', text: '✓ ready · ' + Math.round((f.chars || 0) / 1000) + 'k okkhor' + (f.truncated ? ' (lomba — shesh ongsho kata)' : '') }) : f.status === 'processing' ? $('span', { style: 'color:var(--warn);font-weight:600', text: '⏳ AI porche…' }) : $('span', { style: 'color:var(--bad)', text: '⚠ ' + (f.error || 'hoyni') });
+            var del = $('button', { class: 'btn sm', text: 'Muchun' }); del.disabled = !d.canEdit;
+            del.addEventListener('click', function () { if (!confirm(f.title + ' muchben? AI ar ei file theke uttor dibe na.')) return; api('DELETE', '/api/inbox/files?id=' + f.id).then(function () { st.msg = 'Muche fela hoyeche'; }).catch(function (e) { st.msg = '⚠ ' + e.message; }).then(load); });
+            return $('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:6px 8px;background:var(--soft);border-radius:8px' }, [$('b', { text: (f.ext === 'pdf' ? '📄 ' : '📝 ') + f.title, style: 'flex:1 1 200px;overflow-wrap:anywhere' }), stt, $('span', { class: 'note', text: ago(f.uploaded) }), del]);
+          })) : $('span', { class: 'note', text: 'Ekhono kono file upload kora nai.' })]);
+        ['dragover', 'dragenter'].forEach(function (ev) { zone.addEventListener(ev, function (e) { e.preventDefault(); zone.style.borderColor = 'var(--accent)'; }); });
+        zone.addEventListener('dragleave', function () { zone.style.borderColor = ''; });
+        zone.addEventListener('drop', function (e) { e.preventDefault(); zone.style.borderColor = ''; if (d.canEdit && e.dataTransfer.files.length) upload(e.dataTransfer.files); });
+        box.append(zone);
+        box.append($('p', { class: 'note', text: (st.msg ? st.msg + ' · ' : '') + 'AI purono ' + d.pairs + ' ta team uttor theke o shikheche. Dam/variation: website er product list jitbe; offer o delivery charge: InboxPilot er Offers/Delivery. PDF er lekha Anthropic (Claude) e jay — customer er personal tottho thaka PDF dibenna.' }));
+      }
+      draw(); load();
+      return box;
+    },
     importBox: function () {
       var wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px';
       var days = document.createElement('input'); days.type = 'number'; days.min = '1'; days.max = '365'; days.value = '30'; days.style.width = '5rem'; days.setAttribute('aria-label', 'Koto din');

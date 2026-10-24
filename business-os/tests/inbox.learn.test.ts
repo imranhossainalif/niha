@@ -50,12 +50,12 @@ describe('website knowledge', () => {
 describe('prompt', () => {
   it('puts website passages and past replies in, with the "never copy prices from old replies" rule', () => {
     const p = systemPrompt('Bot', 'PRODUCT: Cerelac ৳650', 'be polite', { web: [{ title: 'Cerelac', url: 'https://kidscarebd.com/cerelac', text: 'Homemade Cerelac, 6 mash+' }], past: [{ q: 'dam koto', a: 'Apu ৳650' }] });
-    expect(p).toContain('WEBSITE (our site');
+    expect(p).toContain('WEBSITE AND FILES (our site');
     expect(p).toContain('https://kidscarebd.com/cerelac');
     expect(p).toContain('PAST REPLIES (our team');
     expect(p).toContain('Customer: dam koto');
     expect(p).toMatch(/Do NOT copy a price, offer, date or stock/);
-    expect(systemPrompt('Bot', 'K', 'R')).not.toContain('WEBSITE (our site');
+    expect(systemPrompt('Bot', 'K', 'R')).not.toContain('WEBSITE AND FILES');
   });
   it('tells the AI to answer in Bangla script, organised, even if the saved rules say otherwise', () => {
     const p = systemPrompt('Bot', 'K', 'Bangla/Banglish/English — customer je bhashay likhe sei bhashay');

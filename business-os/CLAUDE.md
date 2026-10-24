@@ -66,6 +66,11 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
 - **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
   the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,
   BM25 lookup) and the most similar past customer→TEAM reply pairs (`learn.ts`, built from `inbox_messages`, phones scrubbed, 15 min cache).
+  Two websites (`WEBSITE_URL`, `WEBSITE_URL_2`, set in InboxPilot → Knowledge base) are read by `webSync`: pages, plus the shop catalogue
+  (`products.ts`: Shopify `/products.json`, WooCommerce Store API incl. per-variation prices, else JSON-LD on pages) into `inbox_products`;
+  the question's products with every variation + price go into the prompt as SHOP PRODUCTS (they win over KNOWLEDGE for prices).
+  Uploaded PDF/TXT/MD/CSV (`files.ts`, route `/api/inbox/files`, job `inbox_file`): a PDF is read by Claude as a document block (scans/tables/Bangla
+  work), text goes to `inbox_web` kind "file"; originals in MEDIA_DIR/kb, never served. UI: `__bos.sourcesCard()` in `public/legacy/bos-shim.js`.
   Prompt rule: prices/offers/delivery only from KNOWLEDGE (or website); past replies are for tone, never for numbers. Admin → InboxPilot has
   a status line and an "AI test" box (`/api/inbox/test`, sends nothing).
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations

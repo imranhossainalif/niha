@@ -175,6 +175,11 @@ export const PATCHES: Patch[] = [
     find: `You are the business assistant inside Imran's "Business OS" dashboard,`,
     replace: `You are the business assistant inside Imran's "EasyFounder" dashboard,`,
   },
+  {
+    name: 'InboxPilot Knowledge: websites (pages + products) and PDF/file upload for the AI',
+    find: "return [card('Knowledge base', 'AI shudhu ekhane ja ache ta diye uttor dey. Product/offer/courier alada menu te.',",
+    replace: "return [window.__bos.sourcesCard(), card('Knowledge base', 'AI shudhu ekhane ja ache ta diye uttor dey. Product/offer/courier alada menu te.',",
+  },
 ];
 
 export function applyPatches(html: string, patches = PATCHES): string {

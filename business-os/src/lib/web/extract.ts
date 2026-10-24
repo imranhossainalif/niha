@@ -45,7 +45,7 @@ export function htmlToText(html: string): { title: string; text: string } {
   return { title, text: dedup.join('\n').slice(0, 20000) };
 }
 
-export async function fetchReadable(raw: string): Promise<{ url: string; title: string; text: string }> {
+export async function fetchReadable(raw: string, keepHtml = false): Promise<{ url: string; title: string; text: string; html?: string }> {
   let u = await assertPublicUrl(raw);
   for (let hop = 0; hop < 4; hop++) {
     const r = await fetch(u, { redirect: 'manual', signal: AbortSignal.timeout(15000), headers: { 'user-agent': 'BusinessOS/1.0 (+knowledge import)', accept: 'text/html,text/plain;q=0.9,*/*;q=0.1' } });
@@ -56,7 +56,7 @@ export async function fetchReadable(raw: string): Promise<{ url: string; title: 
     const buf = await r.arrayBuffer();
     const body = new TextDecoder().decode(buf.byteLength > MAX_BYTES ? buf.slice(0, MAX_BYTES) : buf);
     const out = type.includes('text/plain') ? { title: u.hostname, text: body.slice(0, 20000) } : htmlToText(body);
-    return { url: u.toString(), ...out };
+    return { url: u.toString(), ...out, ...(keepHtml && !type.includes('text/plain') ? { html: body } : {}) };
   }
   throw Object.assign(new Error('Onek redirect'), { status: 502, code: 'fetch_failed' });
 }

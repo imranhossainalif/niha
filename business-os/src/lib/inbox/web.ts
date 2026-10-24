@@ -6,6 +6,7 @@ import { cfg } from '../config';
 import { assertPublicUrl, fetchReadable } from '../web/extract';
 import { buildIndex, kbSearch, type KbIndex } from '../kb/bm25';
 import { prisma } from '../prisma';
+import { jsonLdProducts, saveProducts, shopProducts, type WebProduct } from './products';
 import { BUSINESS } from './store';
 
 const SKIP_PATH = /\/(cart|checkout|my-account|account|login|register|wp-admin|wp-json|feed|tag|author|search|thank|order-received)(\/|$)|\.(jpg|jpeg|png|gif|webp|svg|pdf|zip|css|js|mp4|xml|ico)(\?|$)/i;
@@ -51,31 +52,42 @@ async function discover(start: URL, max: number): Promise<string[]> {
 
 const id = (url: string) => createHash('sha1').update(url).digest('hex').slice(0, 16);
 
-/** Read the site and store its pages. Returns counts; removes stored pages that no longer exist. */
-export async function webSync(opts: { url?: string; max?: number } = {}) {
-  const raw = opts.url || (await cfg('WEBSITE_URL'));
-  if (!raw) throw new Error('WEBSITE_URL set kora nai (Settings → AI knowledge)');
-  const start = await assertPublicUrl(raw.includes('://') ? raw : 'https://' + raw);
-  const urls = await discover(start, opts.max ?? 80);
+/** Read one site: its pages (text) and its products (variations + prices). Stored per site; stale pages of that site are removed. */
+async function syncSite(raw: string, max: number) {
+  const start = await assertPublicUrl(raw.includes('://') ? raw.trim() : 'https://' + raw.trim());
+  const site = start.hostname.replace(/^www\./, '');
+  const urls = await discover(start, max);
   const col = db().collection('inbox_web');
-  const seen = new Set<string>(); let pages = 0, failed = 0, chars = 0;
+  const seen = new Set<string>(); const jsonld: WebProduct[] = []; let pages = 0, failed = 0, chars = 0;
   const queue = [...urls];
   await Promise.all(Array.from({ length: 3 }, async () => {
     while (queue.length) {
       const u = queue.shift()!;
       try {
-        const r = await fetchReadable(u);
+        const r = await fetchReadable(u, true);
+        if (r.html) jsonld.push(...jsonLdProducts(r.html, r.url));
         if (r.text.length < 80) continue;
         const key = id(r.url.replace(/\/+$/, '')); seen.add(key);
-        await col.doc(key).set({ business: BUSINESS, url: r.url, title: r.title, text: r.text.slice(0, 12000), fetched: new Date().toISOString() });
+        await col.doc(key).set({ business: BUSINESS, kind: 'web', site, url: r.url, title: r.title, text: r.text.slice(0, 12000), fetched: new Date().toISOString() });
         pages++; chars += r.text.length;
       } catch { failed++; }
     }
   }));
   let removed = 0;
-  if (pages >= 1) for (const s of await col.limit(1000).get()) if (!seen.has(s.id)) { await col.doc(s.id).delete(); removed++; }
+  if (pages >= 1) for (const s of await col.where('site', '==', site).limit(1000).get()) if (!seen.has(s.id)) { await col.doc(s.id).delete(); removed++; }
+  // catalogue: the shop's own JSON is exact; pages' schema.org data fills in for shops without one
+  const shop = await shopProducts(start.origin).catch(() => []);
+  const prod = await saveProducts(site, [...jsonld, ...shop]);
   invalidateWebIndex();
-  return { site: start.origin, found: urls.length, pages, failed, removed, chars };
+  return { site, found: urls.length, pages, failed, removed, chars, products: prod.products, product_source: shop[0]?.source ?? (jsonld.length ? 'jsonld' : 'none') };
+}
+
+export async function webSync(opts: { urls?: string[]; max?: number } = {}) {
+  const urls = (opts.urls ?? [await cfg('WEBSITE_URL'), await cfg('WEBSITE_URL_2')]).map((x) => String(x || '').trim()).filter(Boolean);
+  if (!urls.length) return { skipped: 'Website dewa nai (InboxPilot → Knowledge base)' };
+  const sites = [];
+  for (const u of urls) { try { sites.push(await syncSite(u, opts.max ?? 80)); } catch (e) { sites.push({ site: u, error: (e as Error).message }); } }
+  return { sites };
 }
 
 /* ---- lookup ---- */
@@ -108,7 +120,9 @@ export async function searchWeb(query: string, n = 4): Promise<WebHit[]> {
   return best.filter((h) => h.score >= top * 0.35).filter((h) => (seen.has(h.text) ? false : (seen.add(h.text), true))).slice(0, n).map((h) => ({ title: h.source, url: h.file, text: h.text, score: h.score }));
 }
 export async function webStatus() {
-  const rows = await db().collection('inbox_web').limit(1000).get();
-  const last = rows.map((r) => String(r.data.fetched || '')).sort().pop() || null;
-  return { pages: rows.length, last };
+  const rows = await db().collection('inbox_web').limit(2000).get();
+  const sites: Record<string, { pages: number; last: string | null }> = {};
+  for (const r of rows) if ((r.data.kind ?? 'web') === 'web') { const k = String(r.data.site ?? ''); const x = (sites[k] ??= { pages: 0, last: null }); x.pages++; const f = String(r.data.fetched || ''); if (!x.last || f > x.last) x.last = f; }
+  const pages = Object.values(sites).reduce((a, x) => a + x.pages, 0);
+  return { pages, last: Object.values(sites).map((x) => x.last || '').sort().pop() || null, sites };
 }

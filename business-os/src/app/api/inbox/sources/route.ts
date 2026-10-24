@@ -5,7 +5,7 @@ import { cfg, saveConfig } from '@/lib/config';
 import { prisma } from '@/lib/prisma';
 import { inboxPrincipal } from '@/lib/inbox/guard';
 import { webStatus } from '@/lib/inbox/web';
-import { productStats } from '@/lib/inbox/products';
+import { listProducts, productStats } from '@/lib/inbox/products';
 import { listFiles } from '@/lib/inbox/files';
 import { pairCount } from '@/lib/inbox/learn';
 
@@ -14,10 +14,10 @@ const hostOf = (u: string) => { try { return new URL(u.includes('://') ? u : 'ht
 /** What the AI reads: the two websites (pages + products), uploaded files, and how many past replies it learned from. */
 export const GET = handle(async (req: Request) => {
   const p = await inboxPrincipal(req);
-  const [u1, u2, web, prods, files, pairs, job] = await Promise.all([cfg('WEBSITE_URL'), cfg('WEBSITE_URL_2'), webStatus(), productStats(), listFiles(), pairCount().catch(() => 0),
+  const [u1, u2, web, prods, products, files, pairs, job] = await Promise.all([cfg('WEBSITE_URL'), cfg('WEBSITE_URL_2'), webStatus(), productStats(), listProducts(), listFiles(), pairCount().catch(() => 0),
     prisma.job.findFirst({ where: { kind: 'inbox_web_sync' }, orderBy: { createdAt: 'desc' } })]);
   const site = (key: string, url?: string) => { const h = url ? hostOf(url) : ''; return { key, url: url ?? '', host: h, pages: web.sites[h]?.pages ?? 0, last: web.sites[h]?.last ?? null, products: prods[h] ?? 0 }; };
-  return json({ canEdit: isFull(p), sites: [site('WEBSITE_URL', u1), site('WEBSITE_URL_2', u2)], files, pairs, sync: job ? { status: job.status, at: job.createdAt, error: job.error, result: job.result } : null });
+  return json({ canEdit: isFull(p), sites: [site('WEBSITE_URL', u1), site('WEBSITE_URL_2', u2)], files, products, pairs, sync: job ? { status: job.status, at: job.createdAt, error: job.error, result: job.result } : null });
 });
 
 const Put = z.object({ website_1: z.string().max(300).default(''), website_2: z.string().max(300).default('') });

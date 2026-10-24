@@ -3,6 +3,7 @@ import { getPath, getUrl, profileName, sendText } from '../meta/graph';
 import { cfg } from '../config';
 import { decide, hasOrder } from './ai';
 import { contextFor } from './context';
+import { FALLBACK_DEFAULT, formatReply } from './format';
 import { BUSINESS, convMessages, getConfig, knowledgeFor, lastInbound, saveMessage, updateMessage, type Channel, type InboxMessage } from './store';
 
 const DAY = 24 * 3600 * 1000;
@@ -43,6 +44,22 @@ export async function ingestWebhook(body: any): Promise<InboxMessage[]> {
  * Answer a conversation. Waits a few seconds first so a burst of customer messages gets one reply
  * (only the call for the newest message continues).
  */
+/**
+ * The standard "please wait, a team member will reply" message, for every case where the AI does not answer
+ * (it cannot, it failed, or the customer is angry/complaining). Not repeated if it was already sent in the last 15 minutes.
+ */
+async function sendFallback(msg: InboxMessage, cfg: Awaited<ReturnType<typeof getConfig>>, why: string): Promise<'waiting'> {
+  await updateMessage(msg.mid, { status: 'waiting', human: true, ai_why: why.slice(0, 200) }).catch(() => null);
+  try {
+    const recent = await convMessages(msg.conv, 6);
+    if (recent.some((m) => m.fallback && Date.now() - Date.parse(m.ts) < 15 * 60e3)) return 'waiting';
+    const text = (cfg.fallback_text || '').trim() || FALLBACK_DEFAULT;
+    const ids = await sendText(msg.conv, text);
+    await saveMessage({ conv: msg.conv, channel: msg.channel, dir: 'out', by: 'ai', text, mid: ids[0] || 'fb_' + msg.mid, ts: new Date().toISOString(), status: 'open', business: msg.business, fallback: true, source: 'webhook' });
+  } catch (e) { log('fallback send failed', msg.conv, (e as Error).message); }
+  return 'waiting';
+}
+
 export async function autoReply(msg: InboxMessage, debounceMs = 4000): Promise<'sent' | 'waiting' | 'skipped'> {
   const cfg = await getConfig();
   if (!cfg.ai_on) {
@@ -61,20 +78,20 @@ export async function autoReply(msg: InboxMessage, debounceMs = 4000): Promise<'
     d = await decide(cfg.agent_name || 'Kids Care Assistant', kb, rules, history, extras);
   } catch (e) {
     log('AI failed for', msg.conv, (e as Error).message);
-    await updateMessage(msg.mid, { status: 'waiting', human: true });
-    return 'waiting';
+    return sendFallback(msg, cfg, 'AI error: ' + (e as Error).message);
   }
   const order = hasOrder(d.order) ? d.order : null;
   await updateMessage(msg.mid, { intent: d.intent, mood: d.mood, lead: d.lead_score, human: d.needs_human, order, status: d.needs_human ? 'waiting' : 'open', ...(d.note ? { ai_why: d.note } : {}) });
-  // a holding reply ("we have it, the team will confirm the price") still goes out and the chat stays flagged for the team;
-  // an angry customer or a complaint is left to a person
+  // an answer with "the team must follow up" (we have it, the team will confirm the price) still goes out and the chat stays flagged;
+  // when the AI has no answer, or the customer is angry / complaining, the standard "please wait" message goes instead
   const personal = d.mood === 'angry' || d.intent === 'complaint';
-  if (!d.reply.trim() || (d.needs_human && personal)) return 'waiting';
+  const reply = formatReply(d.reply);
+  if (!reply || (d.needs_human && personal)) return sendFallback(msg, cfg, d.note || (personal ? 'angry / complaint' : 'no answer'));
 
   try {
-    const ids = await sendText(msg.conv, d.reply);
+    const ids = await sendText(msg.conv, reply);
     await saveMessage({
-      conv: msg.conv, channel: msg.channel, dir: 'out', by: 'ai', text: d.reply, mid: ids[0] || 'ai_' + msg.mid,
+      conv: msg.conv, channel: msg.channel, dir: 'out', by: 'ai', text: reply, mid: ids[0] || 'ai_' + msg.mid,
       ts: new Date().toISOString(), status: 'open', business: msg.business, intent: d.intent, order, lead: d.lead_score, source: 'webhook',
     });
     return d.needs_human ? 'waiting' : 'sent'; // the chat stays in the team's "waiting" list when they must follow up

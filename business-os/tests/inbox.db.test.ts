@@ -9,7 +9,7 @@ vi.mock('@/lib/anthropic', () => ({ anthropic: () => ({ messages: { create } }),
 
 describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => {
   const conv = 'psid_' + Date.now();
-  const sent: any[] = [];
+  const sent: any[] = []; let outCount = 0;
   let mod: typeof import('@/lib/inbox/process');
   let store: typeof import('@/lib/inbox/store');
   let prisma: typeof import('@/lib/prisma').prisma;
@@ -17,7 +17,7 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
   beforeAll(async () => {
     process.env.META_PAGE_TOKEN = 'test-token';
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
-      if (String(url).includes('/me/messages')) { sent.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify({ message_id: 'm_out_' + sent.length }), { status: 200 }); }
+      if (String(url).includes('/me/messages')) { sent.push(JSON.parse(String(init?.body))); return new Response(JSON.stringify({ message_id: 'm_out_' + (++outCount) }), { status: 200 }); }
       if (String(url).includes(conv)) return new Response(JSON.stringify({ name: 'Test Ma' }), { status: 200 });
       return new Response('{}', { status: 404 });
     }));
@@ -32,6 +32,8 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
     await prisma.$disconnect();
   });
 
+  // the standard wait message is not repeated within 15 minutes: age earlier ones so each test starts clean
+  const ageFallbacks = async () => { for (const x of await store.convMessages(conv, 60)) if (x.fallback) await store.updateMessage(x.mid, { ts: new Date(Date.now() - 100 * 3600e3).toISOString() }); };
   const payload = (mid: string, text: string, extra: object = {}) => ({ object: 'page', entry: [{ id: 'page', messaging: [{ sender: { id: conv }, recipient: { id: 'page' }, timestamp: Date.now(), message: { mid, text, ...extra } }] }] });
 
   it('AI off: message is stored as waiting, nothing is sent', async () => {
@@ -87,11 +89,13 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
     create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: '', intent: 'complaint', mood: 'angry', needs_human: true, lead_score: 10, order: {} }) }] });
     const [m] = await mod.ingestWebhook(payload('m_in_3_' + conv, 'product kharap!'));
     expect(await mod.autoReply(m, 0)).toBe('waiting');
-    expect(sent).toHaveLength(1);
+    expect(sent).toHaveLength(2); // the standard "please wait, a team member will reply" message
+    expect(sent[1].message.text).toContain('টিম মেম্বার');
     expect((await store.lastInbound(conv))).toMatchObject({ status: 'waiting', human: true, mood: 'angry' });
   });
 
-  it('a holding reply ("we have it, the team will confirm the price") is sent AND the chat stays flagged for the team; an angry customer gets no automatic reply', async () => {
+  it('a holding reply ("we have it, the team will confirm the price") is sent AND the chat stays flagged for the team; an angry customer gets only the standard wait message', async () => {
+    await ageFallbacks();
     create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Ji apu Khichuri ache, dam team confirm korbe', intent: 'product_info', mood: 'normal', needs_human: true, note: 'khichuri price not in knowledge', lead_score: 40, order: {} }) }] });
     const [m] = await mod.ingestWebhook(payload('m_in_hold_' + conv, 'khichuri hobe?'));
     const before = sent.length;
@@ -104,13 +108,55 @@ describe.skipIf(!HAS_DB)('InboxPilot end to end (mocked Claude + Graph)', () => 
     create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Sorry apu', intent: 'complaint', mood: 'angry', needs_human: true, note: 'angry', lead_score: 5, order: {} }) }] });
     const [a2] = await mod.ingestWebhook(payload('m_in_angry_' + conv, 'khub kharap service!!'));
     expect(await mod.autoReply(a2, 0)).toBe('waiting');
-    expect(sent).toHaveLength(before); // nothing went out
+    expect(sent).toHaveLength(before + 1); // not the AI's "Sorry apu", only the standard wait message
+    expect(sent.at(-1).message.text).toContain('টিম মেম্বার');
+    expect(sent.at(-1).message.text).not.toContain('Sorry apu');
+    sent.pop();
+    await ageFallbacks(); // so the next tests can send it again
     for (const mid of ['m_in_hold_', 'm_in_angry_']) await store.updateMessage(mid + conv, { ts: new Date(Date.now() - 100 * 3600e3).toISOString() }); // not "fresh" for the 24 h test below
+  });
+
+  it('when the AI has no answer, errors, or the customer is angry, the standard "please wait" message goes out (once per 15 minutes)', async () => {
+    await ageFallbacks();
+    const before = sent.length;
+    // empty answer
+    create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: '', intent: 'other', mood: 'normal', needs_human: true, note: 'cannot say', lead_score: 0, order: {} }) }] });
+    const [m1] = await mod.ingestWebhook(payload('m_in_fb1_' + conv, 'amar ekta alada proshno'));
+    expect(await mod.autoReply(m1, 0)).toBe('waiting');
+    expect(sent).toHaveLength(before + 1);
+    expect(sent.at(-1).message.text).toContain('আপু, একটু অপেক্ষা করুন');
+    expect(sent.at(-1).message.text).toContain('টিম মেম্বার');
+    expect(await store.lastInbound(conv)).toMatchObject({ status: 'waiting', human: true, ai_why: 'cannot say' });
+    // a second miss right after: the message is not repeated
+    create.mockRejectedValueOnce(new Error('overloaded'));
+    const [m2] = await mod.ingestWebhook(payload('m_in_fb2_' + conv, 'ar ekta'));
+    expect(await mod.autoReply(m2, 0)).toBe('waiting');
+    expect(sent).toHaveLength(before + 1);
+    // after 15 minutes it can be sent again; the text is the team's own when they set one
+    for (const x of (await store.convMessages(conv, 60)).filter((y) => y.fallback)) await store.updateMessage(x.mid, { ts: new Date(Date.now() - 20 * 60e3).toISOString() });
+    await store.saveConfig({ fallback_text: 'Apu ektu opekkha korun, team uttor dibe' });
+    create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'Sorry', intent: 'complaint', mood: 'angry', needs_human: true, note: 'angry', lead_score: 0, order: {} }) }] });
+    const [m3] = await mod.ingestWebhook(payload('m_in_fb3_' + conv, 'kharap!!'));
+    await mod.autoReply(m3, 0);
+    expect(sent.at(-1).message.text).toBe('Apu ektu opekkha korun, team uttor dibe');
+    await store.saveConfig({ fallback_text: '' });
+    sent.splice(before);
+    for (const mid of ['m_in_fb1_', 'm_in_fb2_', 'm_in_fb3_']) await store.updateMessage(mid + conv, { ts: new Date(Date.now() - 100 * 3600e3).toISOString() });
+  });
+
+  it('replies go out with blank lines between the parts', async () => {
+    const before = sent.length;
+    create.mockResolvedValueOnce({ stop_reason: 'end_turn', content: [{ type: 'text', text: JSON.stringify({ reply: 'জি আপু, আছে।\n• ২৫০ গ্রাম — ৳৩৫০\n• ৫০০ গ্রাম — ৳৭০০\nকোনটা নেবেন?', intent: 'price', mood: 'normal', needs_human: false, note: '', lead_score: 50, order: {} }) }] });
+    const [m] = await mod.ingestWebhook(payload('m_in_fmt_' + conv, 'dam koto'));
+    await mod.autoReply(m, 0);
+    expect(sent.at(-1).message.text).toBe('জি আপু, আছে।\n\n• ২৫০ গ্রাম — ৳৩৫০\n• ৫০০ গ্রাম — ৳৭০০\n\nকোনটা নেবেন?');
+    sent.splice(before);
+    await store.updateMessage('m_in_fmt_' + conv, { ts: new Date(Date.now() - 100 * 3600e3).toISOString() });
   });
 
   it('team reply inside 24h is sent and clears waiting; outside 24h is refused', async () => {
     await mod.teamSend(conv, 'Sorry apu, ekhoni dekhchi');
-    expect(sent[1].message.text).toBe('Sorry apu, ekhoni dekhchi');
+    expect(sent.at(-1).message.text).toBe('Sorry apu, ekhoni dekhchi');
     expect((await store.lastInbound(conv))).toMatchObject({ status: 'open', human: false });
     await store.updateMessage('m_in_3_' + conv, { ts: new Date(Date.now() - 25 * 3600e3).toISOString() });
     await store.updateMessage('m_in_2_' + conv, { ts: new Date(Date.now() - 26 * 3600e3).toISOString() });

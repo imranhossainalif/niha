@@ -28,7 +28,7 @@ async function getJson(url: string): Promise<{ json: any; headers: Headers } | n
 /* ---- Shopify ---- */
 export function shopifyProducts(list: any[], origin: string, currency = 'BDT'): WebProduct[] {
   return list.map((p) => ({
-    name: clean(p.title, 200), url: origin + '/products/' + p.handle, category: clean(p.product_type, 80) || undefined, description: clean(p.body_html), currency, source: 'shopify' as const,
+    name: clean(p.title, 200), url: origin + '/products/' + p.handle, category: clean(p.product_type, 80) || undefined, description: clean(p.body_html, 2600), currency, source: 'shopify' as const,
     variants: (p.variants ?? []).map((v: any) => ({ label: v.title && v.title !== 'Default Title' ? clean(v.title, 120) : '', price: num(v.price), regular: num(v.compare_at_price) || undefined, available: v.available })).filter((v: Variant) => v.price >= 0),
     available: (p.variants ?? []).some((v: any) => v.available !== false),
   })).filter((p) => p.name && p.variants.length);
@@ -36,6 +36,11 @@ export function shopifyProducts(list: any[], origin: string, currency = 'BDT'): 
 
 /* ---- WooCommerce Store API ---- */
 const wooMoney = (prices: any, key: string) => { const n = num(prices?.[key]); const minor = Number(prices?.currency_minor_unit ?? 2); return Number.isFinite(n) ? n / 10 ** minor : NaN; };
+/** Everything the shop says about a Woo product besides price: full description (ingredients, how to use), short text and fixed attributes. */
+const details = (p: any) => {
+  const fixed = (p.attributes ?? []).filter((a: any) => !a.has_variations && (a.terms ?? []).length).map((a: any) => clean(a.name, 40) + ': ' + (a.terms as any[]).map((t) => clean(t.name, 60)).join(', ')).join('. ');
+  return [clean(p.description, 2200), clean(p.short_description, 400), fixed].filter(Boolean).join('\n').slice(0, 2600);
+};
 /** Woo gives an attribute value as its slug ("%e0%a7%a8...-%e0%a6%97..." for "২৫০ গ্রাম"): turn it back into words. */
 export const unslug = (v: unknown) => { let t = String(v ?? ''); try { t = decodeURIComponent(t); } catch { /* keep as is */ } return clean(t.replace(/-/g, ' '), 80); };
 /** "Size: 500g, Flavor: Rose" -> "500g / Rose" */
@@ -59,7 +64,7 @@ export function wooProducts(list: any[], variationsOf: Record<string, any[]> = {
       const lo = wooMoney(p.prices, 'price'), hi = num(p.prices?.price_range?.max_amount) / 10 ** Number(p.prices?.currency_minor_unit ?? 2);
       if (Number.isFinite(lo)) variants = [{ label: Number.isFinite(hi) && hi > lo ? 'dam ' + lo + ' theke ' + hi + ' porjonto (variation onujayi)' : '', price: lo, regular: wooMoney(p.prices, 'regular_price') || undefined, available: p.is_in_stock }];
     }
-    if (p.name && variants.length) out.push({ name: clean(p.name, 200), url: p.permalink, category: (p.categories ?? []).map((c: any) => clean(c.name, 60)).join(', ') || undefined, description: clean(p.short_description || p.description), currency: cur, variants, available: p.is_in_stock, source: 'woocommerce' });
+    if (p.name && variants.length) out.push({ name: clean(p.name, 200), url: p.permalink, category: (p.categories ?? []).map((c: any) => clean(c.name, 60)).join(', ') || undefined, description: details(p), currency: cur, variants, available: p.is_in_stock, source: 'woocommerce' });
   }
   return out;
 }
@@ -82,10 +87,10 @@ export function jsonLdProducts(html: string, pageUrl: string): WebProduct[] {
     if (t.includes('ProductGroup')) {
       const variants: Variant[] = []; let cur = 'BDT';
       for (const v of [].concat(n.hasVariant ?? [])) { const o = offerPrice((v as any).offers); if (o) { cur = o.cur; variants.push({ label: clean((v as any).name?.replace(n.name, '') || (v as any).name, 120), price: o.price, available: o.avail }); } }
-      if (n.name && variants.length) out.push({ name: clean(n.name, 200), url: n.url || pageUrl, description: clean(n.description), currency: cur, variants, source: 'jsonld' });
+      if (n.name && variants.length) out.push({ name: clean(n.name, 200), url: n.url || pageUrl, description: clean(n.description, 2200), currency: cur, variants, source: 'jsonld' });
     } else if (t.includes('Product')) {
       const o = offerPrice(n.offers); const agg = (Array.isArray(n.offers) ? n.offers[0] : n.offers) ?? {};
-      if (n.name && o) out.push({ name: clean(n.name, 200), url: n.url || pageUrl, category: clean(n.category, 80) || undefined, description: clean(n.description), currency: o.cur, available: o.avail,
+      if (n.name && o) out.push({ name: clean(n.name, 200), url: n.url || pageUrl, category: clean(n.category, 80) || undefined, description: clean(n.description, 2200), currency: o.cur, available: o.avail,
         variants: Array.isArray(n.offers) && n.offers.length > 1 ? n.offers.map((x: any) => ({ label: clean(x.name || x.sku, 100), price: num(x.price), available: /InStock/i.test(String(x.availability)) })).filter((v: Variant) => Number.isFinite(v.price)) : [{ label: agg.highPrice && agg.highPrice !== agg.lowPrice ? 'dam ' + agg.lowPrice + ' theke ' + agg.highPrice + ' porjonto' : '', price: o.price, available: o.avail }], source: 'jsonld' });
     }
   }
@@ -132,6 +137,11 @@ export async function saveProducts(site: string, products: WebProduct[]) {
 export const variantLine = (v: Variant, cur: string) => (v.label ? v.label + ' ' : '') + money(v.price, cur) + (v.available === false ? ' (stock nai)' : '');
 export const productLine = (p: Pick<WebProduct, 'name' | 'variants' | 'currency' | 'url' | 'available'>) => '• ' + p.name + ': ' + p.variants.map((v) => variantLine(v, p.currency)).join('; ') + (p.available === false ? ' [ekhon stock nai]' : '') + (p.url ? ' — ' + p.url : '');
 
+/** The product line plus what the shop says about it (ingredients, how to use), trimmed. */
+/** Cut at a word end, never in the middle of a Bangla letter + vowel sign. */
+export const cutWords = (t: string, n: number) => { if (t.length <= n) return t; const c = t.slice(0, n); const i = c.lastIndexOf(' '); return (i > n * 0.6 ? c.slice(0, i) : c).trim() + ' …'; };
+export const productBlock = (p: WebProduct, detailChars = 700) => productLine(p) + (p.description && detailChars ? '\n   Bibaron (shop theke): ' + cutWords(p.description.replace(/\s+/g, ' '), detailChars) : '');
+
 let cache: { key: string; idx: KbIndex; list: WebProduct[] } | null = null;
 export const invalidateProducts = () => { cache = null; };
 async function index() {
@@ -157,4 +167,11 @@ export async function productStats() {
   const rows = await db().collection('inbox_products').limit(3000).get();
   const by: Record<string, number> = {}; for (const r of rows) by[String(r.data.site)] = (by[String(r.data.site)] || 0) + 1;
   return by;
+}
+
+/** Every synced product, for the Knowledge base screen (name, link, price range, variations). */
+export async function listProducts() {
+  const rows = await db().collection('inbox_products').limit(3000).get();
+  return rows.map((r) => r.data as WebProduct & { site: string }).map((p) => { const prices = p.variants.map((v) => v.price); return { name: p.name, url: p.url, site: p.site, from: Math.min(...prices), to: Math.max(...prices), variants: p.variants.length, currency: p.currency, details: !!p.description }; })
+    .sort((a, b) => a.name.localeCompare(b.name));
 }

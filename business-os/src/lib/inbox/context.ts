@@ -6,7 +6,7 @@ import { recordUsage } from '../aiUsage';
 import { envVal } from '../config';
 import { searchWeb, type WebHit } from './web';
 import { pastExamples, type Pair } from './learn';
-import { productLine, searchProducts, type WebProduct } from './products';
+import { productBlock, searchProducts, type WebProduct } from './products';
 import type { Extras } from './ai';
 import type { InboxMessage } from './store';
 
@@ -43,5 +43,6 @@ export async function contextFor(history: Pick<InboxMessage, 'dir' | 'text'>[]):
   const keywords = await searchKeywords(history.filter((m) => m.dir === 'in').slice(-2).map((m) => m.text).join(' '));
   const q = keywords ? asked + ' ' + keywords : asked;
   const [web, past, products] = await Promise.all([searchWeb(q, 4).catch(() => []), pastExamples(q, 4).catch(() => []), searchProducts(q, 5).catch(() => [])]);
-  return { extras: { web, past, products: products.map(productLine) }, web, past, products, keywords };
+  return { // the best three get the shop's description too (ingredients, how to use); the rest only name, sizes and prices
+  extras: { web, past, products: products.map((p, i) => productBlock(p, i < 3 ? 700 : 0)) }, web, past, products, keywords };
 }

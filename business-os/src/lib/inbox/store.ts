@@ -17,6 +17,7 @@ export type InboxMessage = {
   human?: boolean;
   lead?: number;
   order?: Order | null;
+  fallback?: boolean; // the standard "please wait, a team member will reply" message
   ai_why?: string; // why the AI wanted the team (shown when a chat is left waiting)
   status: 'open' | 'waiting' | 'done';
   name?: string;
@@ -28,6 +29,7 @@ export type InboxConfig = {
   agent_name: string;
   kb?: string; // text the AI reads; empty = compile live from products/offers/couriers/kb
   rules?: string;
+  fallback_text?: string; // sent when the AI can't answer
   [k: string]: unknown;
 };
 

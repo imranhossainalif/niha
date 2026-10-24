@@ -305,6 +305,15 @@
         zone.addEventListener('dragleave', function () { zone.style.borderColor = ''; });
         zone.addEventListener('drop', function (e) { e.preventDefault(); zone.style.borderColor = ''; if (d.canEdit && e.dataTransfer.files.length) upload(e.dataTransfer.files); });
         box.append(zone);
+        if (d.products && d.products.length) {
+          var money = function (n) { return '৳' + Number(n).toLocaleString('en-IN'); };
+          var det = $('details', { style: 'margin-top:4px' }, [$('summary', { style: 'cursor:pointer;font-weight:600', text: 'Shop er ' + d.products.length + ' ta product (AI eigulo jane) — link o dam' }),
+            $('div', { style: 'display:grid;gap:4px;margin-top:8px;max-height:340px;overflow:auto' }, d.products.map(function (p) {
+              var a = $('a', { href: p.url, target: '_blank', rel: 'noreferrer', text: p.name, style: 'font-weight:600;color:var(--accent);text-decoration:none;flex:1 1 220px;overflow-wrap:anywhere' });
+              return $('div', { style: 'display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:4px 8px;background:var(--soft);border-radius:8px' }, [a, $('span', { class: 'note', text: p.variants > 1 ? p.variants + ' size · ' + money(p.from) + ' – ' + money(p.to) : money(p.from) }), p.details ? $('span', { class: 'note', text: 'upadan ✓' }) : $('span', { class: 'note', style: 'color:var(--warn)', text: 'bibaron nai' })]);
+            }))]);
+          box.append(det);
+        }
         box.append($('p', { class: 'note', text: (st.msg ? st.msg + ' · ' : '') + 'AI purono ' + d.pairs + ' ta team uttor theke o shikheche. Dam/variation: website er product list jitbe; offer o delivery charge: InboxPilot er Offers/Delivery. PDF er lekha Anthropic (Claude) e jay — customer er personal tottho thaka PDF dibenna.' }));
       }
       draw(); load();

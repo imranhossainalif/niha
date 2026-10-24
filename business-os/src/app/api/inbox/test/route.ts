@@ -4,6 +4,7 @@ import { isFull } from '@/lib/access';
 import { inboxPrincipal } from '@/lib/inbox/guard';
 import { decide } from '@/lib/inbox/ai';
 import { contextFor } from '@/lib/inbox/context';
+import { formatReply } from '@/lib/inbox/format';
 import { getConfig, knowledgeFor, type InboxMessage } from '@/lib/inbox/store';
 
 export const maxDuration = 120;
@@ -19,5 +20,6 @@ export const POST = handle(async (req: Request) => {
   const { kb, rules } = await knowledgeFor(cfg);
   const ctx = await contextFor(history);
   const decision = await decide(cfg.agent_name || 'Kids Care Assistant', kb, rules, history, ctx.extras);
+  decision.reply = formatReply(decision.reply); // exactly what a customer would get
   return json({ decision, keywords: ctx.keywords, used: { products: ctx.products.map((p) => ({ name: p.name, variants: p.variants.map((v) => ({ label: v.label, price: v.price })), url: p.url })), web: ctx.web.map((h) => ({ title: h.title, url: h.url, text: h.text.slice(0, 300) })), past: ctx.past } });
 });

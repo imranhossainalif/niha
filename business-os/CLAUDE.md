@@ -71,6 +71,10 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   the question's products with every variation + price go into the prompt as SHOP PRODUCTS (they win over KNOWLEDGE for prices).
   Uploaded PDF/TXT/MD/CSV (`files.ts`, route `/api/inbox/files`, job `inbox_file`): a PDF is read by Claude as a document block (scans/tables/Bangla
   work), text goes to `inbox_web` kind "file"; originals in MEDIA_DIR/kb, never served. UI: `__bos.sourcesCard()` in `public/legacy/bos-shim.js`.
+  Reply rules (prompt in `ai.ts`, layout enforced by `format.ts`): Bangla script, everyone is "আপু", short paragraphs with blank lines, an information
+  question gets ONLY the information (no prices unless asked), product descriptions (ingredients) come from `inbox_products.description`.
+  When the AI has no answer / fails / the customer is angry, `process.ts sendFallback` sends the team's standard "please wait" text
+  (`inbox_config.fallback_text`, Admin → InboxPilot; not repeated within 15 min); an answer + "team must follow up" is sent and the chat stays waiting.
   Prompt rule: prices/offers/delivery only from KNOWLEDGE (or website); past replies are for tone, never for numbers. Admin → InboxPilot has
   a status line and an "AI test" box (`/api/inbox/test`, sends nothing).
 - **Config:** `src/lib/config.ts` — `await cfg('KEY')` = env var, else the value saved in Admin → Integrations

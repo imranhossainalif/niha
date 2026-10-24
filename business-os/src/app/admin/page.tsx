@@ -11,6 +11,7 @@ import { getConfig, saveConfig } from '@/lib/inbox/store';
 import { configStatus } from '@/lib/config';
 import { IntegrationsForm } from '@/components/IntegrationsForm';
 import { InboxTest } from '@/components/InboxTest';
+import { FALLBACK_DEFAULT } from '@/lib/inbox/format';
 import { webStatus } from '@/lib/inbox/web';
 import { pairCount } from '@/lib/inbox/learn';
 import type { Role } from '@/lib/access';
@@ -82,6 +83,15 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
     revalidatePath('/admin');
   }
 
+  async function saveFallback(fd: FormData) {
+    'use server';
+    await requireAdmin();
+    const text = String(fd.get('fallback_text') || '').trim().slice(0, 600);
+    await saveConfig({ fallback_text: text });
+    revalidatePath('/admin');
+    redirect('/admin?msg=saved');
+  }
+
   async function queueJob(fd: FormData) {
     'use server';
     const p = await requireAdmin();
@@ -151,6 +161,12 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
           <span>💬 Purono uttor theke: <b>{pairs}</b> ta proshno-uttor jora (team er ager reply)</span>
           <span className="muted">Dam, offer, delivery charge shudhu Dashboard er InboxPilot → Products/Offers/Delivery theke. Website ar purono uttor shudhu bujhiye bolar jonno.</span>
         </div>
+        <form action={saveFallback} className="grid gap-1 text-sm">
+          <b>AI uttor dite na parle ei message jabe</b>
+          <textarea className="input" name="fallback_text" rows={3} defaultValue={String(inbox.fallback_text || '') || FALLBACK_DEFAULT} />
+          <span className="muted">Ager 15 minute er moddhe pathano hole abar pathabe na. Raag/complaint er message e o ei-ta jabe, tarpor apnader team uttor dibe.</span>
+          <div><button className="btn" type="submit">Save</button></div>
+        </form>
         <InboxTest />
       </section>
 

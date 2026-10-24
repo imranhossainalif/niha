@@ -56,7 +56,8 @@ const id = (url: string) => createHash('sha1').update(url).digest('hex').slice(0
 async function syncSite(raw: string, max: number) {
   const start = await assertPublicUrl(raw.includes('://') ? raw.trim() : 'https://' + raw.trim());
   const site = start.hostname.replace(/^www\./, '');
-  const urls = await discover(start, max);
+  const shop = await shopProducts(start.origin).catch(() => []); // the shop's own list first: its product pages are always read too
+  const urls = [...new Set([...(await discover(start, max)), ...shop.map((p) => p.url).filter(Boolean)])].slice(0, max + shop.length);
   const col = db().collection('inbox_web');
   const seen = new Set<string>(); const jsonld: WebProduct[] = []; let pages = 0, failed = 0, chars = 0;
   const queue = [...urls];
@@ -76,7 +77,6 @@ async function syncSite(raw: string, max: number) {
   let removed = 0;
   if (pages >= 1) for (const s of await col.where('site', '==', site).limit(1000).get()) if (!seen.has(s.id)) { await col.doc(s.id).delete(); removed++; }
   // catalogue: the shop's own JSON is exact; pages' schema.org data fills in for shops without one
-  const shop = await shopProducts(start.origin).catch(() => []);
   const prod = await saveProducts(site, [...jsonld, ...shop]);
   invalidateWebIndex();
   return { site, found: urls.length, pages, failed, removed, chars, products: prod.products, product_source: shop[0]?.source ?? (jsonld.length ? 'jsonld' : 'none') };

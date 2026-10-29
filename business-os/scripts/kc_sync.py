@@ -296,7 +296,10 @@ if len(sys.argv) > 6:
             c7 = (o.get("reps") or {}).get(r, 0); s6 = agg.get((d, r))
             if s6 and s6["calls"] >= c7:
                 reps[r] = s6["calls"]; rcv[r] = s6["received"]; ordr[r] = s6["orders"]; otk[r] = round(s6["tk"]); pick[r] = "v6"
-            else: reps[r] = c7; pick[r] = "v7" if c7 else ""
+            else:
+                reps[r] = c7; pick[r] = "v7" if c7 else ""
+                if s6:  # partial call-sheet rows: keep their receive/order rather than showing nothing
+                    rcv[r] = s6["received"]; ordr[r] = s6["orders"]; otk[r] = round(s6["tk"])
         t6 = {k: sum(agg[(d, r)][k] for r in REPS if (d, r) in agg) for k in ("calls", "received", "orders")}
         v7full = {"date": d, "reps": o.get("reps", {}), "calls": o.get("calls", 0), "received": o.get("received", 0), "orders": o.get("orders", 0)}
         doc = {"date": d, "reps": reps, "rcv": rcv, "ord": ordr, "otk": otk, "order_tk": sum(otk.values()), "calls": sum(reps.values()),

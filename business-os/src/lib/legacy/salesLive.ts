@@ -7,8 +7,8 @@ function stLiveCards(REPS, L) {
   const today = todayStr();
   const pct = (a, b) => (b ? Math.round((a / b) * 100) + '%' : '—');
   const longDate = (d) => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
-  const repRows = (d) => [...REPS.map((n) => ({ n, c: (d.reps || {})[n] || 0, r: (d.rcv || {})[n] || 0, o: (d.ord || {})[n] || 0, t: (d.otk || {})[n] || 0 })), { n: 'Mot', c: d.calls || 0, r: d.received || 0, o: d.orders || 0, t: d.order_tk || 0, _t: true }];
-  const repTable = (d) => table([{ l: 'Rep', f: (x) => el('b', {}, x.n) }, { l: 'Call', r: 1, f: (x) => nf.format(x.c) }, { l: 'Receive', r: 1, f: (x) => x.r }, { l: 'Receive %', r: 1, f: (x) => pct(x.r, x.c) }, { l: 'Order', r: 1, f: (x) => (x._t ? el('b', {}, String(x.o)) : x.o) }, { l: 'Conv %', r: 1, f: (x) => pct(x.o, x.r) }, { l: 'Order ৳', r: 1, f: (x) => (x.t ? tk(x.t) : '—') }], repRows(d));
+  const repRows = (d) => [...REPS.map((n) => ({ n, c: (d.reps || {})[n] || 0, r: (d.rcv || {})[n], o: (d.ord || {})[n], t: (d.otk || {})[n] || 0 })), { n: 'Mot', c: d.calls || 0, r: d.received || 0, o: d.orders || 0, t: d.order_tk || 0, _t: true }];
+  const repTable = (d) => table([{ l: 'Rep', f: (x) => el('b', {}, x.n) }, { l: 'Call', r: 1, f: (x) => nf.format(x.c) }, { l: 'Receive', r: 1, f: (x) => (x.r == null ? '—' : x.r) }, { l: 'Receive %', r: 1, f: (x) => (x.r == null ? '—' : pct(x.r, x.c)) }, { l: 'Order', r: 1, f: (x) => (x._t ? el('b', {}, String(x.o)) : x.o == null ? '—' : x.o) }, { l: 'Conv %', r: 1, f: (x) => (x.r == null || x.o == null ? '—' : pct(x.o, x.r)) }, { l: 'Order ৳', r: 1, f: (x) => (x.t ? tk(x.t) : '—') }], repRows(d));
   const td0 = cd.find((r) => r.date === today) || { date: today, reps: {}, rcv: {}, ord: {}, otk: {}, calls: 0, received: 0, orders: 0, order_tk: 0 };
   // the call sheet's own "today" table has per-rep receive/order even when the merged daily doc doesn't
   const lt = L && Array.isArray(L.today) && String(L.today_label || '').startsWith(Number(today.slice(8)) + ' ') ? L.today : [];

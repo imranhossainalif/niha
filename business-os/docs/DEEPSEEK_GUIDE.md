@@ -17,6 +17,33 @@ Stack: Next.js 15 (App Router) · TypeScript · PostgreSQL 16 + Prisma 6 · Auth
 **Bhasha:** UI Banglish (Roman akkhor e Bangla). Customer ke Messenger reply **Bangla script e**, shobai ke "আপু".
 User (Imran) Banglish e likhe — tumi Banglish e uttor dao, step-by-step, kon button e click korte hobe shoho.
 
+## 1.1 Ekhon porjonto ki ki build hoyeche (live, 105 test pass, API version 1.10.2)
+
+- **Core:** Doc store (`docs` table) + login (owner/admin/staff) + purono shob tab (legacy UI shim e) + API/API key/OpenAPI/MCP + nightly `pg_dump` backup.
+- **Nuport sync, Sheets sync** (Apps Script push + `kc_sync.py`) → sales, calls, staff data.
+- **Sales Team tab:** "Aaj live" card + din-wise call/receive/order (rep-wise; je rep er data nai tar jaygay `—`).
+- **Attendance tab (Kids Care):** office hours, fine rules, `staff_<YYYY-MM>` theke.
+- **GA4 traffic:** business-wise (Kids Care ar LRF alada), weekly/monthly graph, kon page e beshi traffic.
+- **Settings → API o connection:** Anthropic, Meta, Nuport, Make, Sheets, GA4 er live health + limit/credit; dashboard e warning.
+- **Make.com status** dashboard e.
+- **InboxPilot (Messenger AI):** webhook, AI auto-reply (Bangla script, "আপু", gochano layout), team reply (24h rule), flag for team,
+  standard "please wait" fallback, shop catalogue (variation + price) 2 ta website theke, website crawl, PDF/file upload,
+  past team reply theke shekha, AI test box, Admin status line. Knowledge base e product link.
+- **Social Media tab (Publer-er moto):** Facebook, Instagram, YouTube, TikTok; composer + schedule, calendar, analytics (BD time,
+  best time/format), AI suggestions, competitors, accounts tab (setup guide shoho). FB group e API post hoy na — shudhu suggestion.
+- **Branding:** EasyFounder logo/favicon/title.
+- **Legal pages:** `/legal/privacy`, `/legal/terms` (TikTok/Google er jonno).
+
+### Ekhono baki (target / roadmap)
+1. Makhna type product lookup fix (section 9).
+2. Native (React) version of purono tab gulo — Overview, Tasks, Money/Loans, Kids Care Sales/P&L/Costing/Growth Engine
+   (calc module ache: `src/lib/calc/*`). **Purono tab ta rekhe**, notun ta match korle tobei link koro.
+3. Typed Prisma model hot collection gulo r jonno (tasks, sales_daily, calls_daily, transactions, loans, inbox_messages, leads, clients).
+4. Sentry (error monitoring).
+5. Nuport order-status lookup by phone (offer dewa hoyeche, user er decision baki).
+6. Domain easyfounder.si/.site e move (DNS + `.env` DOMAIN/PUBLIC_URL + Apps Script/Meta/OAuth redirect URL update).
+7. Shob original goal er shothik list: `docs/ORIGINAL_BRIEF.md` (build order) — ekhane dekho.
+
 ## 2. Aage ei file gulo poro (ei order e)
 
 1. `business-os/CLAUDE.md` — architecture er shobcheye updated nôte (eta ei project er "main guide")

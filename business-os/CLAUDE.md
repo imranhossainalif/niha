@@ -10,7 +10,7 @@ Self-hosted business OS for Imran Hossain Alif (Bangladesh), branded **EasyFound
 - Analytics collections hold aggregates only (no customer names/phones). Customer data lives only in `inbox_messages`
   (role-restricted) and goes only to Meta and Anthropic.
 - **Never remove an existing tab or option** when refactoring. UI language is Banglish; keep existing labels.
-- `data/` and `.env` never go into git (the GitHub repo is public).
+- `data/` and `.env` never go into git (the GitHub repo is private, but secrets in history stay there).
 
 ## Stack
 Next.js 15 (App Router, route handlers, server actions) · TypeScript · PostgreSQL 16 + Prisma 6 · Auth.js v5 credentials (JWT)

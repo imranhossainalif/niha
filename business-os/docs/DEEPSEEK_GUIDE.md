@@ -54,7 +54,7 @@ User (Imran) Banglish e likhe — tumi Banglish e uttor dao, step-by-step, kon b
 ## 3. Non-negotiable niyom (kokhono bhangbe na)
 
 - **Kono tab ba option remove korbe na.** Notun jinish add koro, purono ta rekhe.
-- **`data/` ar `.env` kokhono git e jabe na.** Repo **public**.
+- **`data/` ar `.env` kokhono git e jabe na.** Repo **private**, tobuo secret git e dile history te theke jay.
 - **Kono secret/API key/password code e, chat e, commit e likhbe na.** User ke chat e key paste korte bolbe na;
   Settings/Admin → Integrations e boshate bolo (encrypted save hoy). Env/config pora **sudhu `await cfg('KEY')`** diye.
 - Analysis text e **FACT** (data theke) ar **HYPOTHESIS** (anuman) alada label koro. CPM/CTR/sales er guarantee dibe na.

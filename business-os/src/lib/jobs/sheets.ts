@@ -9,6 +9,7 @@ import path from 'node:path';
 import { db } from '../db';
 import { cfg } from '../config';
 import { downloadSheet } from '../google';
+import { withCallDetail, type DocWrite } from './callDetail';
 
 export type SheetFiles = { callLiveCsv: Buffer; upsalesXlsx: Buffer; dailyXlsx: Buffer; v6Xlsx?: Buffer; upsOldXlsx?: Buffer };
 
@@ -31,19 +32,23 @@ export async function runKcSync(files: SheetFiles) {
     await fs.writeFile(f('upsales.xlsx'), files.upsalesXlsx);
     await fs.writeFile(f('daily.xlsx'), files.dailyXlsx);
     const args = [path.join(process.cwd(), 'scripts', 'kc_sync.py'), f('call_live.csv'), f('upsales.xlsx'), f('daily.xlsx'), f('out')];
+    // Existing calls_daily: the Python merge needs them for v6 numbers, and they keep the per-rep detail of past syncs.
+    const existing = (await db().collection('calls_daily').limit(5000).get()).map((s) => ({ id: s.id, data: s.data as Record<string, unknown> }));
     if (files.v6Xlsx && files.upsOldXlsx) {
       await fs.writeFile(f('v6.xlsx'), files.v6Xlsx);
       await fs.writeFile(f('ups_old.xlsx'), files.upsOldXlsx);
       // existing calls_daily, so older days keep their v7 numbers
       await fs.mkdir(f('existing'));
-      for (const s of await db().collection('calls_daily').limit(5000).get()) await fs.writeFile(path.join(f('existing'), s.id + '.json'), JSON.stringify(s.data));
+      for (const s of existing) await fs.writeFile(path.join(f('existing'), s.id + '.json'), JSON.stringify(s.data));
       args.push(f('v6.xlsx'), f('ups_old.xlsx'), f('existing'));
     }
     await run(process.env.PYTHON || 'python3', ['-I', ...args]);
-    const writes: { collection: string; doc_id: string; data: Record<string, unknown> }[] = JSON.parse(await fs.readFile(f('out/writes.json'), 'utf8'));
+    const writes: DocWrite[] = JSON.parse(await fs.readFile(f('out/writes.json'), 'utf8'));
     const store = db();
+    // keep the per-rep detail of past syncs, add today's / the sheet's selected-day table, normalize the live dates
+    const out = withCallDetail(writes, existing);
     let n = 0;
-    for (const w of writes) {
+    for (const w of out) {
       if (!['calls_daily', 'sales_team'].includes(w.collection)) continue; // the script only ever writes these
       await store.collection(w.collection).doc(w.doc_id).set(w.data);
       n++;

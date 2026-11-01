@@ -1,0 +1,41 @@
+{
+  "asof": "2026-10-31T05:00:00Z",
+  "today_label": "31 October",
+  "selected_label": "30 October",
+  "today_date": "2026-10-31",
+  "selected_date": "2026-10-30",
+  "today": [
+    { "name": "Lamia", "calls": 12, "received": 4, "rcv_pct": 33.3, "orders": 0, "conv_pct": 0, "order_tk": 0, "whatsapp": 2, "target": 20 },
+    { "name": "Nusrat", "calls": 8, "received": 3, "rcv_pct": 37.5, "orders": 1, "conv_pct": 33.3, "order_tk": 1250, "whatsapp": 1, "target": 20 },
+    { "name": "Shayla", "calls": 0, "received": 0, "rcv_pct": 0, "orders": 0, "conv_pct": 0, "order_tk": 0, "whatsapp": 0, "target": 15 },
+    { "name": "Jhumur", "calls": 31, "received": 14, "rcv_pct": 45.2, "orders": 2, "conv_pct": 14.3, "order_tk": 2400, "whatsapp": 3, "target": 25 },
+    { "name": "Maruf", "calls": 5, "received": 1, "rcv_pct": 20, "orders": 0, "conv_pct": 0, "order_tk": 0, "whatsapp": 0, "target": 15 },
+    { "name": "Total", "calls": 56, "received": 22, "rcv_pct": 39.3, "orders": 3, "conv_pct": 13.6, "order_tk": 3650, "whatsapp": 6, "target": 95 }
+  ],
+  "selected_day": [
+    { "name": "Lamia", "calls": 12, "received": 4, "rcv_pct": 33.3, "orders": 0, "conv_pct": 0, "order_tk": 0, "whatsapp": 2, "target": 20 },
+    { "name": "Nusrat", "calls": 8, "received": 3, "rcv_pct": 37.5, "orders": 1, "conv_pct": 33.3, "order_tk": 1250, "whatsapp": 1, "target": 20 },
+    { "name": "Shayla", "calls": 0, "received": 0, "rcv_pct": 0, "orders": 0, "conv_pct": 0, "order_tk": 0, "whatsapp": 0, "target": 15 },
+    { "name": "Jhumur", "calls": 31, "received": 14, "rcv_pct": 45.2, "orders": 2, "conv_pct": 14.3, "order_tk": 2400, "whatsapp": 3, "target": 25 },
+    { "name": "Maruf", "calls": 5, "received": 1, "rcv_pct": 20, "orders": 0, "conv_pct": 0, "order_tk": 0, "whatsapp": 0, "target": 15 },
+    { "name": "Total", "calls": 56, "received": 22, "rcv_pct": 39.3, "orders": 3, "conv_pct": 13.6, "order_tk": 3650, "whatsapp": 6, "target": 95 }
+  ],
+  "last7": [
+    { "name": "Jhumur", "calls": 180, "received": 92, "rcv_pct": 51.1, "orders": 11, "conv_pct": 12, "order_tk": 14300, "whatsapp": 14, "avg_calls": 25.7, "avg_orders": 1.6 },
+    { "name": "Total", "calls": 380, "received": 171, "rcv_pct": 45, "orders": 19, "conv_pct": 11.1, "order_tk": 24750, "whatsapp": 30, "avg_calls": 54.3, "avg_orders": 2.7 }
+  ],
+  "month": [
+    { "name": "Jhumur", "calls": 620, "received": 301, "rcv_pct": 48.5, "orders": 39, "conv_pct": 13, "order_tk": 51200, "whatsapp": 51, "avg_calls": 22.1, "avg_orders": 1.4 },
+    { "name": "Total", "calls": 1310, "received": 597, "rcv_pct": 45.6, "orders": 74, "conv_pct": 12.4, "order_tk": 96800, "whatsapp": 101, "avg_calls": 46.8, "avg_orders": 2.6 }
+  ],
+  "pipeline": [
+    { "name": "Total", "leads": 2100, "not_called": 800, "due_today": 120, "overdue": 240, "no_answer": 510, "talked": 690, "interested": 180, "ordered": 74, "not_interested": 260, "dropped": 66 }
+  ],
+  "segments": [
+    { "name": "Total", "champion": 40, "regular": 260, "new": 180, "at_risk": 90, "sleeping": 320, "lost": 110, "avg_score": 42, "score70": 210 }
+  ],
+  "courier": [
+    { "name": "Total", "checked": 900, "reliable": 700, "ok": 650, "new_courier": 30, "risk": 40, "reported": 12, "avg_success": 81 }
+  ],
+  "merged_note": "v6 (purono call sheet) + v7 milano: proti rep proti din jei sheet e beshi call, sheta nawa (double count hoy na)."
+}

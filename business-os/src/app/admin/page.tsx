@@ -184,6 +184,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
             <button key={k} className="btn" name="kind" value={k} type="submit">{l}</button>
           ))}
         </form>
+        <div className="overflow-x-auto">
         <table className="t">
           <thead><tr><th>Kaj</th><th>Status</th><th>Kobe</th><th>Result</th></tr></thead>
           <tbody>
@@ -192,12 +193,14 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
             ))}
           </tbody>
         </table>
+        </div>
       </section>
 
       {me.role === 'owner' && (
         <section className="card grid gap-2">
           <h2 className="font-semibold">API keys (Claude / automation)</h2>
           <p className="muted text-sm">Key oi owner er hoye kaj kore. Read = shudhu dekha, write = likha o.</p>
+          <div className="overflow-x-auto">
           <table className="t">
             <thead><tr><th>Naam</th><th>Prefix</th><th>Scope</th><th>Shesh use</th><th /></tr></thead>
             <tbody>
@@ -209,6 +212,7 @@ export default async function Admin({ searchParams }: { searchParams: Promise<{ 
               ))}
             </tbody>
           </table>
+          </div>
           <form action={newKey} className="flex flex-wrap items-center gap-2">
             <input className="input max-w-xs" name="name" placeholder="key er naam (jemon: weekly growth task)" required />
             <label className="flex items-center gap-1 text-sm"><input type="checkbox" name="write" /> write</label>

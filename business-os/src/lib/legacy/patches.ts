@@ -201,3 +201,53 @@ export function legacyDocument(legacyHtml: string): string {
     + '<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/brand/favicon-32.png"><link rel="apple-touch-icon" href="/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b372f">\n'
     + applyPatches(legacyHtml) + '\n</html>\n';
 }
+
+/* ===== LocalServiceHQ business (agency/LRF structure) ===== */
+PATCHES.push(
+  {
+    name: 'LocalServiceHQ: add the business to the legacy BIZ list',
+    find: `  { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
+  { id: 'itevs', name: 'Itevs Digital', color: '#1F6FB8' },`,
+    replace: `  { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
+  { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },
+  { id: 'itevs', name: 'Itevs Digital', color: '#1F6FB8' },`,
+  },
+  {
+    name: 'LocalServiceHQ: add the sidebar item under Local Revenue Flow',
+    find: `      <button class="nav" data-go="biz:lrf"><svg viewBox="0 0 16 16" fill="#5FD0A3"><circle cx="8" cy="8" r="4"/></svg>Local Revenue Flow</button>`,
+    replace: `      <button class="nav" data-go="biz:lrf"><svg viewBox="0 0 16 16" fill="#5FD0A3"><circle cx="8" cy="8" r="4"/></svg>Local Revenue Flow</button>
+      <button class="nav" data-go="biz:localservicehq"><svg viewBox="0 0 16 16" fill="#4ADE80"><circle cx="8" cy="8" r="4"/></svg>LocalServiceHQ</button>`,
+  },
+  {
+    name: 'LocalServiceHQ: agency tabs are valid for this business too',
+    find: `(route === 'biz:lrf' ?`,
+    replace: `((route === 'biz:lrf' || route === 'biz:localservicehq') ?`,
+  },
+  {
+    name: 'LocalServiceHQ: tabsFor uses the agency tab set',
+    find: `const tabsFor = (r) => (r === 'biz:lrf' ? ATABS :`,
+    replace: `const tabsFor = (r) => ((r === 'biz:lrf' || r === 'biz:localservicehq') ? ATABS :`,
+  },
+  {
+    name: 'LocalServiceHQ: AG_ID must follow the active business',
+    find: `const AG_ID = 'lrf';`,
+    replace: `let AG_ID = 'lrf';`,
+  },
+  {
+    name: 'LocalServiceHQ: set AG_ID from the route on every render',
+    find: `  const isBiz = route.startsWith('biz:'); const bid = isBiz ? route.slice(4) : null;`,
+    replace: `  const isBiz = route.startsWith('biz:'); const bid = isBiz ? route.slice(4) : null;
+  AG_ID = bid === 'localservicehq' ? 'localservicehq' : 'lrf';`,
+  },
+  {
+    name: 'LocalServiceHQ: live hash target',
+    find: `const LIVE_HASH = { kidscare: '#kidscare', itevs: '#itevs', insafia: '#insafia', lrf: '#lrf', others: '#all' };`,
+    replace: `const LIVE_HASH = { kidscare: '#kidscare', itevs: '#itevs', insafia: '#insafia', lrf: '#lrf', localservicehq: '#localservicehq', others: '#all' };`,
+  },
+  {
+    name: 'LocalServiceHQ: default settings row',
+    find: `  lrf: { ad_accounts: [], margin: 80, usd_rate: 122, competitors: [] },`,
+    replace: `  lrf: { ad_accounts: [], margin: 80, usd_rate: 122, competitors: [] },
+  localservicehq: { ad_accounts: [], margin: 85, usd_rate: 122, competitors: [] },`,
+  },
+);

@@ -1,0 +1,11 @@
+{
+ "business": "localservicehq",
+ "name": "FB group reply - cost question",
+ "channel": "FB group",
+ "subject": "When a homeowner asks what concrete costs",
+ "body": "Costs vary by state, but a 4-inch slab is usually $6-$15 per sq ft installed. Here is a free calculator that gives you yards and a price range before you call anyone: localservicehq.com/tools/concrete-calculator\n\nHappy to sanity-check a quote if you post the line items.",
+ "sent": 0,
+ "replies": 0,
+ "positive": 0,
+ "status": "testing"
+}

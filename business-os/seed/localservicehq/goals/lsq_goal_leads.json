@@ -1,0 +1,12 @@
+{
+ "business": "localservicehq",
+ "title": "Monthly homeowner quote requests",
+ "metric": "Quote requests",
+ "target": 300,
+ "current": 0,
+ "unit": "leads",
+ "due": "2027-01-31",
+ "status": "active",
+ "horizon": "Q1",
+ "note": "From calculators and state pages"
+}

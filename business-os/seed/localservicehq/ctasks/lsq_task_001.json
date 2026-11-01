@@ -1,0 +1,11 @@
+{
+ "title": "Claim directory profile + upload photos",
+ "client": "lsq_client_001",
+ "assignee": "Imran",
+ "status": "todo",
+ "priority": "high",
+ "start": "2026-11-01",
+ "due": "2026-11-05",
+ "hours": 2,
+ "business": "localservicehq"
+}

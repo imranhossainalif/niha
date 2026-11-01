@@ -250,4 +250,22 @@ PATCHES.push(
     replace: `  lrf: { ad_accounts: [], margin: 80, usd_rate: 122, competitors: [] },
   localservicehq: { ad_accounts: [], margin: 85, usd_rate: 122, competitors: [] },`,
   },
+  // Social Media tab for the agency businesses (owner request 2026-11-01 for LocalServiceHQ; LRF shares the
+  // same ATABS set, so it gains the tab too). The native /social/<business> page and its APIs are already
+  // business-generic — only the agency tab bar, route allow-list and view dispatch were missing the entry.
+  {
+    name: 'Agency tabs: Social Media tab, after Content',
+    find: `['outreach', 'Outreach'], ['content', 'Content'], ['pipeline', 'Pipeline'],`,
+    replace: `['outreach', 'Outreach'], ['content', 'Content'], ['social', 'Social Media'], ['pipeline', 'Pipeline'],`,
+  },
+  {
+    name: 'Agency tabs: social is an allowed route',
+    find: `'outreach','content','pipeline'`,
+    replace: `'outreach','content','social','pipeline'`,
+  },
+  {
+    name: 'Agency tabs: social view (native page in a frame, same as other businesses)',
+    find: `product: bizProduct, content: bizContent, competitors: bizContent, team: bizTeam, calendar: bizCalendar, settings: bizSettings };`,
+    replace: `product: bizProduct, content: bizContent, competitors: bizContent, team: bizTeam, social: socialView, calendar: bizCalendar, settings: bizSettings };`,
+  },
 );

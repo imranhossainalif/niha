@@ -55,6 +55,7 @@ function App({ business, canAdmin }: { business: string; canAdmin: boolean }) {
 
   return (
     <div ref={root} className="sm">
+      <div className="sm-top">
       <header className="sm-card sm-head" style={{ padding: '14px 16px' }}>
         <div className="stack" style={{ gap: 2 }}>
           <h1>Social Media</h1>
@@ -67,6 +68,7 @@ function App({ business, canAdmin }: { business: string; canAdmin: boolean }) {
       <nav className="sm-seg" role="tablist" style={{ justifySelf: 'start' }}>
         {TABS.map(([k, l, ic]) => <button key={k} type="button" role="tab" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}><Icon name={ic} size={15} />{l}</button>)}
       </nav>
+      </div>
       {accounts && !accounts.length && tab !== 'accounts' && (
         <div className="sm-card tint row sm-fade"><Icon name="users" style={{ color: 'var(--accent)' }} /><span className="grow">Post korte ar analytics dekhte age Facebook, Instagram, YouTube ba TikTok connect korun.</span><button className="sm-btn primary sm" onClick={() => setTab('accounts')}>Account connect</button></div>
       )}

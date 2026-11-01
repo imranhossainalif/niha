@@ -1,12 +1,12 @@
 'use client';
-// Connect accounts: Facebook + Instagram (through the Meta system-user token), YouTube (Google login),
-// TikTok (TikTok login). Each platform card shows what is connected and the exact one-time setup.
+// Connect accounts: Facebook + Instagram (one-click Facebook login, or the Meta system-user token),
+// YouTube (Google login), TikTok (TikTok login). Each card shows what is connected and the one-time setup.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, compact, Modal, useToast, type Account } from './ui';
 
 type Found = { network: 'facebook' | 'instagram'; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
-type Prov = { meta: boolean; youtube: boolean; tiktok: boolean };
+type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean };
 const DESC: Record<Net, string> = {
   facebook: 'Page e post (chobi, album, video, link) · reach, react, comment, share',
   instagram: 'Chobi, Reel, Carousel · reach, like, save · competitor research',
@@ -37,7 +37,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
     catch (e) { toast((e as Error).message, 'err'); }
     setBusy('');
   };
-  const oauth = (p: 'youtube' | 'tiktok') => {
+  const oauth = (p: 'youtube' | 'tiktok' | 'meta') => {
     const w = window.open(`/api/social/oauth/${p}/start?business=${business}`, 'bos-oauth', 'width=540,height=760');
     if (!w) toast('Popup bondho — browser e popup allow korun', 'err');
   };
@@ -65,14 +65,24 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
   };
 
   const metaBtn = <button className="sm-btn primary" onClick={discover} disabled={busy === 'meta' || prov?.meta === false}>{busy === 'meta' ? <span className="sm-spin" /> : <Icon name="search" size={14} />}Page / Instagram khujun</button>;
+  const metaDiscoverGhost = <button className="sm-btn" onClick={discover} disabled={busy === 'meta'}>{busy === 'meta' ? <span className="sm-spin" /> : <Icon name="search" size={14} />}Aro Page khujun</button>;
+  const metaConnectBtn = <button className="sm-btn primary" onClick={() => oauth('meta')}><NetLogo net="facebook" size={16} />Facebook diye connect</button>;
+  const fbAction = prov?.metaApp
+    ? <div className="row" style={{ flexWrap: 'wrap' }}>{metaConnectBtn}{prov.meta && metaDiscoverGhost}</div>
+    : prov?.meta === false
+      ? <span className="sm-warn"><Icon name="alert" />Age Settings e Meta App ID boshan (nicher guide) — tarpor ek click ei connect hobe.</span>
+      : metaBtn;
+  const igAction = prov?.metaApp ? metaConnectBtn : prov?.meta === false
+    ? <span className="muted xs">Facebook er sathe eki connect — Facebook card theke connect korun.</span>
+    : metaBtn;
   const ytBtn = prov?.youtube ? <button className="sm-btn primary" onClick={() => oauth('youtube')}><NetLogo net="youtube" size={16} />Google diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "YouTube setup" korun (Google client ID lagbe).</span>;
   const ttBtn = prov?.tiktok ? <button className="sm-btn primary" onClick={() => oauth('tiktok')}><NetLogo net="tiktok" size={16} />TikTok diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "TikTok setup" korun (TikTok client key lagbe).</span>;
 
   return (
     <div className="stack" style={{ gap: 14 }}>
       <div className="sm-grid sm-g2">
-        {card('facebook', prov?.meta === false ? <span className="sm-warn"><Icon name="alert" />Age Settings e Meta "Social media token" boshan (nicher guide).</span> : metaBtn)}
-        {card('instagram', prov?.meta === false ? <span className="muted xs">Facebook er sathe eki token — Facebook Page er sathe link kora Instagram e ashe.</span> : metaBtn)}
+        {card('facebook', fbAction)}
+        {card('instagram', igAction)}
         {card('youtube', ytBtn)}
         {card('tiktok', ttBtn)}
       </div>
@@ -80,13 +90,13 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
       <section className="sm-card stack">
         <h2>Ekbar setup: ki ki korte hobe</h2>
         <span className="muted sm-t">Protita platform er nijer app/permission lage. Ekbar korle bar bar lagbe na.</span>
-        <Guide net="facebook" title="Facebook + Instagram setup">
+        <Guide net="facebook" title="Facebook + Instagram setup (one-click)">
           <li><b>Instagram ke professional account banan:</b> Instagram app → Settings → <i>Account type and tools</i> → <i>Switch to professional account</i> → Business.</li>
-          <li><b>Instagram ke Page er sathe link:</b> Facebook e Kids Care BD Page → Settings → <i>Linked accounts</i> → Instagram → Connect.</li>
-          <li><b>Meta app e permission:</b> <a className="lnk" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">developers.facebook.com/apps</a> → apnar app → <i>Use cases</i> → Add → "Manage everything on your Page" ar "Manage messaging &amp; content on Instagram".</li>
-          <li><b>System user ke access:</b> <a className="lnk" href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer">Business settings → System users</a> → <i>business-os</i> → <i>Assign assets</i> → Pages → Kids Care BD → Full control; Instagram accounts → Kids Care → Full control.</li>
-          <li><b>Token:</b> oi system user e <i>Generate new token</i> → tick: <code>pages_manage_posts</code> <code>pages_read_engagement</code> <code>read_insights</code> <code>instagram_basic</code> <code>instagram_content_publish</code> <code>instagram_manage_insights</code> <code>pages_show_list</code> <code>business_management</code> <code>ads_read</code> → Generate → copy.</li>
-          <li>Dashboard → <b>Settings</b> → Meta card → "Key bosan" → <i>Social media token</i> e paste → Save. Tarpor upore <b>"Page / Instagram khujun"</b>.</li>
+          <li><b>Instagram ke Page er sathe link:</b> Facebook e Kids Care BD Page → Settings → <i>Linked accounts</i> → Instagram → Connect. (Ei duita Meta er niyom — app diyeo lage.)</li>
+          <li><b>Settings e Meta App ID boshan:</b> Dashboard → Settings → <i>Meta (InboxPilot)</i> → <i>Meta App ID</i> — ID ta <a className="lnk" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">developers.facebook.com/apps</a> → apnar app → <i>Settings → Basic</i> e paben. <i>App secret</i> o eki jaygay — jodi InboxPilot er jonno age theke bosano thake, ar lagbe na.</li>
+          <li><b>Meta app e Facebook Login chalu:</b> oi app → <i>Add product</i> → <i>Facebook Login</i> → <i>Settings</i> → <i>Valid OAuth Redirect URIs</i> e eta din: <CopyCode text={cb + 'meta/callback'} /> → Save.</li>
+          <li><b>Bas, ek click:</b> upore <b>"Facebook diye connect"</b> → Facebook login → Page bachai → Allow. Page ar link-kora Instagram nijei connect hoye jabe — kono token copy/paste nai.</li>
+          <li><b>Jene rakhun:</b> login token ~60 din thake; meyad shesh hole abar ek click e connect korlei hobe. Purono system-user token er upay o ache — Settings e <i>Social media token</i> boshaile setai age use hobe.</li>
         </Guide>
         <Guide net="youtube" title="YouTube setup (Google)">
           <li><a className="lnk" href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">console.cloud.google.com</a> e notun project: naam <i>EasyFounder</i>.</li>

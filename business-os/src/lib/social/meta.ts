@@ -1,9 +1,10 @@
 // Facebook Page + Instagram (business) through the Graph API: find accounts, publish, read posts with metrics,
-// and read competitors' public Instagram posts (Business Discovery). One system-user token (META_SOCIAL_TOKEN, else
-// META_ADS_TOKEN) gives page tokens on the fly, so no page token is ever stored.
+// and read competitors' public Instagram posts (Business Discovery). One user token — the Settings system-user
+// token (META_SOCIAL_TOKEN), else the one-click Facebook Login token, else META_ADS_TOKEN — gives page tokens
+// on the fly, so no page token is ever stored.
 // Facts this follows: Meta removed posting to Groups from the API (2024); Instagram needs a public media URL and
 // can't post text only; Facebook Page post metrics need pages_read_engagement + read_insights.
-import { cfg } from '../config';
+import { cfg, readSecret } from '../config';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
 export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok';
@@ -39,9 +40,50 @@ export async function graphAll(path: string, opts: Parameters<typeof graph>[1], 
 }
 
 export async function socialToken(): Promise<string> {
-  const t = (await cfg('META_SOCIAL_TOKEN')) || (await cfg('META_ADS_TOKEN'));
-  if (!t) throw Object.assign(new Error('Social media token nai: Settings → Meta Social token boshan'), { status: 400, code: 'not_connected' });
+  const t = (await cfg('META_SOCIAL_TOKEN')) || (await metaUserToken()) || (await cfg('META_ADS_TOKEN'));
+  if (!t) throw Object.assign(new Error('Social media connect nai: Social Media → Accounts e "Facebook diye connect" chapun, ba Settings e Meta social token boshan'), { status: 400, code: 'not_connected' });
   return t;
+}
+
+/* ---------- one-click connect: Facebook Login (OAuth) ---------- */
+export const META_SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights', 'business_management', 'ads_read'];
+
+/** Facebook Login dialog URL: the user just logs in and approves — no token to copy or paste. */
+export function metaAuthUrl(appId: string, redirect: string, state: string): string {
+  const u = new URL('https://www.facebook.com/v21.0/dialog/oauth');
+  u.searchParams.set('client_id', appId);
+  u.searchParams.set('redirect_uri', redirect);
+  u.searchParams.set('response_type', 'code');
+  u.searchParams.set('scope', META_SCOPES.join(','));
+  u.searchParams.set('state', state);
+  return u.toString();
+}
+
+export type MetaTokens = { access_token: string; expires_at: number };
+/** OAuth code → short-lived user token → long-lived (~60 day) user token. */
+export async function metaExchangeCode(appId: string, secret: string, code: string, redirect: string, f?: Fetch): Promise<MetaTokens> {
+  const call = async (params: Record<string, string>) => {
+    const u = new URL(GRAPH + '/oauth/access_token');
+    for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
+    const r = await (f ?? fetch)(u.toString(), { signal: AbortSignal.timeout(30000) });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok || j.error || !j.access_token) throw new GraphError(j.error?.message || 'Meta token exchange hoyni (' + r.status + ')', j.error?.code, r.status);
+    return j as { access_token: string; expires_in?: number };
+  };
+  const short = await call({ client_id: appId, client_secret: secret, redirect_uri: redirect, code });
+  const long = await call({ grant_type: 'fb_exchange_token', client_id: appId, client_secret: secret, fb_exchange_token: short.access_token });
+  return { access_token: long.access_token, expires_at: Date.now() + (Number(long.expires_in) || 5184000) * 1000 };
+}
+
+export async function metaMe(token: string, f?: Fetch): Promise<{ id: string; name: string }> {
+  const j = await graph('/me', { token, f, params: { fields: 'id,name' } });
+  return { id: String(j.id), name: String(j.name || '') };
+}
+
+/** The one-click (Facebook Login) user token, while it is still valid — stored as an encrypted secret by the OAuth callback. */
+export async function metaUserToken(): Promise<string | undefined> {
+  const t = await readSecret<MetaTokens & { access_token: string }>('meta:user').catch(() => null);
+  return t && t.access_token && t.expires_at > Date.now() + 60e3 ? t.access_token : undefined;
 }
 
 const pageTokens = new Map<string, { t: string; at: number }>();

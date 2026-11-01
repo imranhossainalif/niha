@@ -1,24 +1,28 @@
-// "Login with Google / TikTok" for YouTube and TikTok accounts. Tokens are stored encrypted (config.saveSecret),
-// never in docs (docs are synced to browsers). getAccess() refreshes an expired access token.
+// "Login with Google / TikTok / Facebook" for YouTube, TikTok and Meta (Facebook + Instagram) accounts.
+// Tokens are stored encrypted (config.saveSecret), never in docs (docs are synced to browsers).
+// getAccess() refreshes an expired access token (YouTube/TikTok); the Meta token is shared, see meta.ts.
 import { cfg, readSecret, saveSecret } from '../config';
+import { META_SCOPES, metaAuthUrl, metaExchangeCode } from './meta';
 
-export type Provider = 'youtube' | 'tiktok';
+export type Provider = 'youtube' | 'tiktok' | 'meta';
 export type Tokens = { access_token: string; refresh_token?: string; expires_at: number; scope?: string; open_id?: string };
 
 export const redirectUri = (origin: string, p: Provider) => (process.env.PUBLIC_URL || origin).replace(/\/$/, '') + '/api/social/oauth/' + p + '/callback';
 export const SCOPES: Record<Provider, string> = {
   youtube: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
   tiktok: 'user.info.basic,user.info.profile,user.info.stats,video.list,video.upload,video.publish',
+  meta: META_SCOPES.join(','),
 };
 
 async function creds(p: Provider) {
-  const [id, secret] = p === 'youtube' ? [await cfg('YOUTUBE_CLIENT_ID'), await cfg('YOUTUBE_CLIENT_SECRET')] : [await cfg('TIKTOK_CLIENT_KEY'), await cfg('TIKTOK_CLIENT_SECRET')];
-  if (!id || !secret) throw Object.assign(new Error((p === 'youtube' ? 'YouTube (Google) client ID/secret' : 'TikTok client key/secret') + ' Settings e boshano nai'), { status: 400, code: 'not_connected' });
+  const [id, secret] = p === 'youtube' ? [await cfg('YOUTUBE_CLIENT_ID'), await cfg('YOUTUBE_CLIENT_SECRET')] : p === 'tiktok' ? [await cfg('TIKTOK_CLIENT_KEY'), await cfg('TIKTOK_CLIENT_SECRET')] : [await cfg('META_APP_ID'), await cfg('META_APP_SECRET')];
+  if (!id || !secret) throw Object.assign(new Error((p === 'youtube' ? 'YouTube (Google) client ID/secret' : p === 'tiktok' ? 'TikTok client key/secret' : 'Meta App ID/secret') + ' Settings e boshano nai'), { status: 400, code: 'not_connected' });
   return { id, secret };
 }
 
 export async function authUrl(p: Provider, state: string, origin: string) {
   const { id } = await creds(p);
+  if (p === 'meta') return metaAuthUrl(id, redirectUri(origin, p), state);
   const u = new URL(p === 'youtube' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://www.tiktok.com/v2/auth/authorize/');
   const q = p === 'youtube'
     ? { client_id: id, redirect_uri: redirectUri(origin, p), response_type: 'code', scope: SCOPES.youtube, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state }
@@ -35,7 +39,10 @@ async function tokenCall(p: Provider, body: Record<string, string>, f: typeof fe
   if (!r.ok || j.error) throw new Error((p === 'youtube' ? 'Google' : 'TikTok') + ': ' + (j.error_description || j.error?.message || j.error || r.status));
   return { access_token: j.access_token, refresh_token: j.refresh_token ?? body.refresh_token, expires_at: Date.now() + (Number(j.expires_in) || 3600) * 1000, scope: j.scope, open_id: j.open_id };
 }
-export const exchangeCode = (p: Provider, code: string, origin: string, f?: typeof fetch) => tokenCall(p, { code, grant_type: 'authorization_code', redirect_uri: redirectUri(origin, p) }, f);
+export const exchangeCode = async (p: Provider, code: string, origin: string, f?: typeof fetch): Promise<Tokens> => {
+  if (p === 'meta') { const { id, secret } = await creds(p); const t = await metaExchangeCode(id, secret, code, redirectUri(origin, p), f); return { access_token: t.access_token, expires_at: t.expires_at, scope: SCOPES.meta }; }
+  return tokenCall(p, { code, grant_type: 'authorization_code', redirect_uri: redirectUri(origin, p) }, f);
+};
 
 /** Valid access token for a connected account (doc id), refreshed when it is about to expire. */
 export async function getAccess(p: Provider, accountId: string, f?: typeof fetch): Promise<string> {

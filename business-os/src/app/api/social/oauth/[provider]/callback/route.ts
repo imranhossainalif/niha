@@ -6,6 +6,7 @@ import { isFull } from '@/lib/access';
 import { exchangeCode, type Provider } from '@/lib/social/oauth';
 import { channel } from '@/lib/social/youtube';
 import { profile } from '@/lib/social/tiktok';
+import { discoverAccounts, metaMe } from '@/lib/social/meta';
 
 const origin = (req: Request) => { const h = req.headers, host = h.get('x-forwarded-host') || h.get('host'); return host ? (h.get('x-forwarded-proto') || 'https') + '://' + host : new URL(req.url).origin; };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -30,6 +31,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   if (!code) return page(false, 'Code pawa jayni.', st.business);
   try {
     const t = await exchangeCode(provider, code, origin(req));
+    if (provider === 'meta') {
+      // One-click Facebook + Instagram: keep the long-lived user token as a shared secret (publishing/analytics
+      // derive page tokens from it) and connect every Page / Instagram this login can manage to this business.
+      const me = await metaMe(t.access_token);
+      await saveSecret('meta:user', { access_token: t.access_token, expires_at: t.expires_at, user_id: me.id, name: me.name });
+      const found = await discoverAccounts(t.access_token);
+      const biz = st.business || 'kidscare';
+      for (const a of found) {
+        await db(p).collection('social_accounts').doc(a.network + '_' + a.ext_id).set({ business: biz, network: a.network, ext_id: a.ext_id, page_id: a.network === 'facebook' ? a.ext_id : a.page_id || '', name: a.name, username: a.username, picture: a.picture, followers: a.followers, active: true, connected_at: new Date().toISOString(), error: '' });
+      }
+      if (!found.length) return page(false, 'Kono Facebook Page pawa jayni — je Facebook account diye login korechen sheta diye ekta Page manage thakte hobe. Page thakle abar connect kore Page ta select korun.', biz);
+      return page(true, found.length + ' ta account connect hoyeche: ' + found.map((a) => a.name).join(', ') + '. Ei window bondho korun.', biz);
+    }
     const info = provider === 'youtube' ? await channel(t.access_token) : await profile(t.access_token);
     const id = provider + '_' + info.id;
     await saveSecret('oauth:' + id, t);

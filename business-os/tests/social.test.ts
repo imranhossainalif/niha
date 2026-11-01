@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyze, bdHour, bdWeekday, engagement, engRate } from '@/lib/social/analytics';
-import { fbFormat, igFormat, publishFacebook, publishInstagram, type Fetch } from '@/lib/social/meta';
+import { fbFormat, igFormat, metaAuthUrl, metaExchangeCode, publishFacebook, publishInstagram, type Fetch } from '@/lib/social/meta';
 
 const post = (created: string, format: string, m: Record<string, number>, content_type?: string) => ({ network: 'facebook', account_id: 'p', ext_id: created, created, format, content_type, metrics: { reactions: 0, comments: 0, shares: 0, ...m } });
 
@@ -57,6 +57,30 @@ function fakeGraph() {
   }) as Fetch;
   return { f, calls };
 }
+
+describe('Meta one-click connect (mocked)', () => {
+  it('login URL points at the Facebook dialog with the posting scopes', () => {
+    const u = new URL(metaAuthUrl('APP1', 'https://os.example/api/social/oauth/meta/callback', 'st8'));
+    expect(u.origin + u.pathname).toBe('https://www.facebook.com/v21.0/dialog/oauth');
+    expect(u.searchParams.get('client_id')).toBe('APP1');
+    expect(u.searchParams.get('redirect_uri')).toContain('/api/social/oauth/meta/callback');
+    expect(u.searchParams.get('scope')).toContain('pages_manage_posts');
+    expect(u.searchParams.get('scope')).toContain('instagram_content_publish');
+  });
+  it('code exchange upgrades the short token to a long-lived one', async () => {
+    const grants: (string | null)[] = [];
+    const f = (async (input: any) => {
+      const u = new URL(String(input));
+      grants.push(u.searchParams.get('grant_type'));
+      const long = u.searchParams.get('grant_type') === 'fb_exchange_token';
+      return { ok: true, status: 200, json: async () => ({ access_token: long ? 'LONG' : 'SHORT', expires_in: long ? 5184000 : 3600 }) };
+    }) as Fetch;
+    const t = await metaExchangeCode('APP1', 'SEC', 'CODE', 'https://os.example/cb', f);
+    expect(grants).toEqual([null, 'fb_exchange_token']);
+    expect(t.access_token).toBe('LONG');
+    expect(t.expires_at).toBeGreaterThan(Date.now() + 50 * 86400e3);
+  });
+});
 
 describe('publishing (mocked Meta)', () => {
   it('Facebook: one photo goes to /photos with the page token', async () => {

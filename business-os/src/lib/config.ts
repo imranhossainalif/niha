@@ -23,6 +23,8 @@ export const CONFIG_FIELDS = [
   { key: 'YOUTUBE_CLIENT_SECRET', label: 'YouTube (Google) OAuth client secret', group: 'YouTube + TikTok', secret: true, help: 'same OAuth client' },
   { key: 'TIKTOK_CLIENT_KEY', label: 'TikTok client key', group: 'YouTube + TikTok', secret: false, help: 'developers.tiktok.com → your app → Credentials' },
   { key: 'TIKTOK_CLIENT_SECRET', label: 'TikTok client secret', group: 'YouTube + TikTok', secret: true, help: 'same app' },
+  { key: 'PINTEREST_APP_ID', label: 'Pinterest App ID', group: 'Pinterest', secret: false, help: 'developers.pinterest.com → your app → App ID' },
+  { key: 'PINTEREST_APP_SECRET', label: 'Pinterest App secret', group: 'Pinterest', secret: true, help: 'same app → App secret' },
   { key: 'NUPORT_API_KEY', label: 'Nuport API key', group: 'Nuport', secret: true, help: 'Kids Care orders' },
   { key: 'NUPORT_START_SO', label: 'First run: last SO number already counted', group: 'Nuport', secret: false, help: 'e.g. 12345 (only used once)' },
   { key: 'SHEETS_PUSH_ENABLED', label: 'Accept pushes from the Google Apps Script', group: 'Google Sheets', secret: false, help: 'on/off (default on)' },

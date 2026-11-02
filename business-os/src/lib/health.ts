@@ -273,7 +273,7 @@ async function socialCheck(): Promise<Health> {
   const own = await cfg('META_SOCIAL_TOKEN');
   const token = own || (await cfg('META_ADS_TOKEN'));
   const accts = (await db().collection('social_accounts').limit(100).get()).map((x) => x.data as { name: string; network: string; active?: boolean; error?: string }).filter((a) => a.active !== false);
-  const NET: Record<string, string> = { facebook: 'FB ', instagram: 'IG ', youtube: 'YouTube ', tiktok: 'TikTok ' };
+  const NET: Record<string, string> = { facebook: 'FB ', instagram: 'IG ', youtube: 'YouTube ', tiktok: 'TikTok ', pinterest: 'Pinterest ' };
   if (!token) return { ...base, status: accts.length ? 'ok' : 'off', summary: accts.length ? accts.length + ' ta account connect (Facebook/Instagram er token nai).' : 'Social token nai — post/schedule kora jabe na.', fix: 'Kids Care → Social Media → Accounts e step gulo dekhun.' };
   const t = await debugToken(token);
   if (!t.is_valid) return { ...base, status: 'bad', summary: 'Social token kaj korche na.', details: [['Meta bolche', t.error?.message || 'invalid token']], fix: 'Notun system user token banan.' };

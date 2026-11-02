@@ -6,12 +6,13 @@ import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, compact, Modal, useToast, type Account } from './ui';
 
 type Found = { network: 'facebook' | 'instagram'; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
-type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean };
+type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean; pinterest: boolean };
 const DESC: Record<Net, string> = {
   facebook: 'Page e post (chobi, album, video, link) · reach, react, comment, share',
   instagram: 'Chobi, Reel, Carousel · reach, like, save · competitor research',
   youtube: 'Video / Shorts upload · view, like, comment, subscriber',
   tiktok: 'Video post ba TikTok app e draft · view, like, comment, share',
+  pinterest: 'Chobi pin board e · impression, save, click',
 };
 
 export function Accounts({ business, accounts, canAdmin, onChange }: { business: string; accounts: Account[]; canAdmin: boolean; onChange: () => void }) {
@@ -37,7 +38,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
     catch (e) { toast((e as Error).message, 'err'); }
     setBusy('');
   };
-  const oauth = (p: 'youtube' | 'tiktok' | 'meta') => {
+  const oauth = (p: 'youtube' | 'tiktok' | 'meta' | 'pinterest') => {
     const w = window.open(`/api/social/oauth/${p}/start?business=${business}`, 'bos-oauth', 'width=540,height=760');
     if (!w) toast('Popup bondho — browser e popup allow korun', 'err');
   };
@@ -77,6 +78,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
     : metaBtn;
   const ytBtn = prov?.youtube ? <button className="sm-btn primary" onClick={() => oauth('youtube')}><NetLogo net="youtube" size={16} />Google diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "YouTube setup" korun (Google client ID lagbe).</span>;
   const ttBtn = prov?.tiktok ? <button className="sm-btn primary" onClick={() => oauth('tiktok')}><NetLogo net="tiktok" size={16} />TikTok diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "TikTok setup" korun (TikTok client key lagbe).</span>;
+  const pinBtn = prov?.pinterest ? <button className="sm-btn primary" onClick={() => oauth('pinterest')}><NetLogo net="pinterest" size={16} />Pinterest diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "Pinterest setup" korun (Pinterest App ID lagbe).</span>;
 
   return (
     <div className="stack" style={{ gap: 14 }}>
@@ -85,6 +87,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
         {card('instagram', igAction)}
         {card('youtube', ytBtn)}
         {card('tiktok', ttBtn)}
+        {card('pinterest', pinBtn)}
       </div>
 
       <section className="sm-card stack">
@@ -115,6 +118,13 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
           <li>Ekhoni test korte: <b>Sandbox</b> → Create → <i>Target users</i> e Kids Care er TikTok add → sandbox er client key/secret nin. Live er jonno <b>Submit for review</b> (likhun: "Our own company account: scheduling and analytics") — 3-10 din lage.</li>
           <li><b>Client key</b> ar <b>Client secret</b> → Dashboard → Settings → "YouTube + TikTok" → Save → upore <b>"TikTok diye connect"</b>.</li>
           <li><b>Jene rakhun:</b> TikTok review/audit er age "Shorasori post" kevol <i>Only me</i> hoy — tai default e "TikTok app e draft" deya: video TikTok app e notification hoye ashe, sound diye okhan theke post korben.</li>
+        </Guide>
+        <Guide net="pinterest" title="Pinterest setup">
+          <li><a className="lnk" href="https://developers.pinterest.com/" target="_blank" rel="noreferrer">developers.pinterest.com</a> e business er Pinterest account diye login → <i>My apps</i> → <b>Create app</b>: naam <i>EasyFounder</i>, website: <CopyCode text={cb.split('/api/')[0] || ''} /></li>
+          <li>App e <i>Redirect links</i> e eta din: <CopyCode text={cb + 'pinterest/callback'} /></li>
+          <li><b>App ID</b> ar <b>App secret</b> → Dashboard → Settings → <i>Pinterest</i> → Save → upore <b>"Pinterest diye connect"</b>.</li>
+          <li>Connect er shomoy account er shob board save hoy — post korar shomoy pin account er <b>prothom board</b> e jabe (Composer theke board bodlano jay). Pinterest e age theke board na thakle ekta baniye nin.</li>
+          <li><b>Jene rakhun:</b> notun app prothome <b>Trial access</b> e thake — tokhon pin shudhu ekta private sandbox board e jay, public e na. Public pin er jonno app er page theke <b>Standard access</b> er apply korun (Pinterest review kore, kichu din lage). Ekhon shudhu <b>chobi pin</b> supported — video pin pore asbe.</li>
         </Guide>
       </section>
 

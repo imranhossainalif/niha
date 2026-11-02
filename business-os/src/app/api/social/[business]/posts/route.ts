@@ -31,6 +31,7 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   if (b.action === 'schedule' && (!b.scheduled_at || Date.parse(b.scheduled_at) < Date.now() - 60e3)) throw Object.assign(new Error('Shamner ekta shomoy din'), { status: 400, code: 'bad_request' });
   if (b.targets.some((t) => t.network === 'instagram') && !b.media.length) throw Object.assign(new Error('Instagram e chobi ba video lagbe'), { status: 400, code: 'bad_request' });
   if (b.targets.some((t) => t.network === 'youtube' || t.network === 'tiktok') && (b.media.length !== 1 || !b.media[0].mime.startsWith('video/'))) throw Object.assign(new Error('YouTube/TikTok e ekta video lagbe'), { status: 400, code: 'bad_request' });
+  if (b.targets.some((t) => t.network === 'pinterest') && !b.media.some((m) => m.mime.startsWith('image/'))) throw Object.assign(new Error('Pinterest e chobi lagbe (video pin ekhono na)'), { status: 400, code: 'bad_request' });
   const doc: SocialPost & Record<string, unknown> = {
     business, text: b.text, media: b.media, link: b.link || undefined, labels: b.labels, content_type: b.content_type, options: b.options,
     targets: b.targets.map((t) => ({ ...t, status: 'pending' as const })),

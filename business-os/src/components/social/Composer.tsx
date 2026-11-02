@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, Label, Modal, Seg, TYPE_LABEL, upload, useToast, WEEKDAYS, type Account, type MediaRef, type Post, type PostOptions } from './ui';
 
-const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200 };
+const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200, pinterest: 800 };
 const toLocalInput = (iso?: string | null) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const isVideo = (m: { mime: string }) => m.mime.startsWith('video/');
 export type Draft = Partial<Post> & { idea_label?: string };
@@ -56,6 +56,7 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
     if (nets.includes('instagram') && media.length > 10) p.push('Instagram e 10 tar beshi na.');
     if (nets.includes('facebook') && media.length > 1 && media.some(isVideo)) p.push('Facebook e video ekta-i (chobir sathe na).');
     for (const n of ['youtube', 'tiktok'] as Net[]) if (nets.includes(n) && (media.length !== 1 || !isVideo(media[0]))) p.push(NET_NAME[n] + ' e ekta video lagbe (chobi na).');
+    if (nets.includes('pinterest') && !media.some((m) => !isVideo(m))) p.push('Pinterest e chobi lagbe (video pin ekhono na).');
     for (const a of chosen) if (textFor(a.id).length > LIMIT[a.network]) p.push(a.name + ' (' + NET_NAME[a.network] + '): lekha ' + LIMIT[a.network] + ' okkhorer beshi.');
     if (!media.length && !text.trim() && !link) p.push('Kichu likhun ba chobi/video din.');
     return p;
@@ -164,7 +165,7 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
             <input ref={file} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
           </div>
 
-          {(nets.includes('youtube') || nets.includes('tiktok')) && (
+          {(nets.includes('youtube') || nets.includes('tiktok') || nets.includes('pinterest')) && (
             <div className="sm-grid sm-g2 sm-fade">
               {nets.includes('youtube') && (
                 <div className="sm-card flat stack" style={{ padding: 12 }}>
@@ -183,6 +184,16 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
                   <Seg value={opt.tt_mode ?? 'inbox'} onChange={(v) => setOpt({ ...opt, tt_mode: v })} small items={[['inbox', 'TikTok app e draft'], ['direct', 'Shorasori post']]} />
                   {opt.tt_mode === 'direct' && <select className="sm-input" value={opt.tt_privacy} onChange={(e) => setOpt({ ...opt, tt_privacy: e.target.value })} aria-label="Ke dekhbe"><option value="PUBLIC_TO_EVERYONE">Shobai</option><option value="FOLLOWER_OF_CREATOR">Follower ra</option><option value="MUTUAL_FOLLOW_FRIENDS">Bondhu ra</option><option value="SELF_ONLY">Shudhu ami</option></select>}
                   <span className="muted xs">{opt.tt_mode === 'direct' ? 'TikTok audit er age shorasori post "Only me" hoye jay.' : 'Video TikTok app e notification hishebe jabe — sound/effect diye okhan theke post korun.'}</span>
+                </div>
+              )}
+              {nets.includes('pinterest') && (
+                <div className="sm-card flat stack" style={{ padding: 12 }}>
+                  <span className="row" style={{ fontWeight: 700 }}><NetLogo net="pinterest" size={18} />Pinterest</span>
+                  <label className="sm-label">Board<select className="sm-input" value={opt.pin_board ?? ''} onChange={(e) => setOpt({ ...opt, pin_board: e.target.value || undefined })} aria-label="Pinterest board">
+                    <option value="">Account er prothom board</option>
+                    {chosen.filter((a) => a.network === 'pinterest').flatMap((a) => (a.boards ?? []).map((b) => <option key={a.id + b.id} value={b.id}>{a.name}: {b.name}</option>))}
+                  </select></label>
+                  <span className="muted xs">Shudhu prothom chobi ta pin hobe; post er prothom line = pin er title, purota = description (800 okkhor). Link thakle pin shekhane-i jabe.</span>
                 </div>
               )}
             </div>
@@ -229,6 +240,12 @@ export function PostPreview({ a, text, media, link, title }: { a: Account; text:
       {vis({ width: '100%', aspectRatio: '9/16' })}
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '40px 12px 14px', background: 'linear-gradient(transparent, rgba(0,0,0,.75))', color: '#fff', fontSize: 13 }}><b>@{name}</b><div className="clamp3" style={{ whiteSpace: 'pre-wrap' }}>{text}</div></div>
       <div style={{ position: 'absolute', right: 10, bottom: 90, display: 'grid', gap: 14, color: '#fff', justifyItems: 'center' }}><Icon name="heart" size={26} /><Icon name="comment" size={26} /><Icon name="share" size={26} /></div>
+    </div>);
+  if (a.network === 'pinterest') return (
+    <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden', maxWidth: 300, margin: '0 auto' }}>
+      {vis({ width: '100%', aspectRatio: '2/3' })}
+      <div style={{ padding: 12, display: 'grid', gap: 4 }}><b style={{ fontSize: 15 }}>{(text.split('\n')[0] || 'Pin er title').slice(0, 100)}</b>
+        <span className="muted xs clamp3" style={{ whiteSpace: 'pre-wrap' }}>{text}</span>{link && <span className="muted xs">🔗 {link}</span>}</div>
     </div>);
   if (a.network === 'youtube') return (
     <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>

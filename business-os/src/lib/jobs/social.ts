@@ -10,19 +10,20 @@ import { mediaFile } from '../social/media';
 import { getAccess } from '../social/oauth';
 import { channel, publishYouTube, youtubePosts, type YtOptions } from '../social/youtube';
 import { profile, publishTikTok, tiktokPosts, type TtOptions } from '../social/tiktok';
+import { pinBoards, pinProfile, pinterestPosts, publishPinterest, type PinBoard } from '../social/pinterest';
 import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, publishFacebook, publishInstagram, socialToken, type Fetch, type Network } from '../social/meta';
 import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
 import { recordUsage } from '../aiUsage';
 
 export type Target = { account_id: string; network: Network; name?: string; text?: string; status?: 'pending' | 'published' | 'failed'; ext_post_id?: string; permalink?: string; error?: string; note?: string; at?: string };
-export type PostOptions = { yt_title?: string; yt_privacy?: YtOptions['privacy']; yt_kids?: boolean; tt_mode?: TtOptions['mode']; tt_privacy?: TtOptions['privacy'] };
+export type PostOptions = { yt_title?: string; yt_privacy?: YtOptions['privacy']; yt_kids?: boolean; tt_mode?: TtOptions['mode']; tt_privacy?: TtOptions['privacy']; pin_board?: string };
 export type SocialPost = {
   business: string; status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed';
   text: string; media: { id: string; url: string; mime: string }[]; link?: string; labels?: string[]; content_type?: string;
   targets: Target[]; scheduled_at?: string | null; published_at?: string; created_by?: string; error?: string; options?: PostOptions;
 };
-export type SocialAccount = { business: string; network: Network; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; active?: boolean; uploads?: string; error?: string };
+export type SocialAccount = { business: string; network: Network; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; active?: boolean; uploads?: string; board_id?: string; boards?: PinBoard[]; error?: string };
 
 const accounts = async (business?: string) =>
   (await db().collection('social_accounts').limit(200).get()).map((s) => ({ id: s.id, ...(s.data as SocialAccount) })).filter((a) => a.active !== false && (!business || a.business === business));
@@ -48,6 +49,7 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
       const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
       const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
         : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
+        : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
         : await publishVideo(a.network, a.id, post, input.text, f);
       targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
     } catch (e) {
@@ -98,9 +100,10 @@ export async function socialSync(opts: { days?: number; f?: Fetch } = {}) {
   for (const a of list) {
     try {
       let posts, n: number | null;
-      if (a.network === 'youtube' || a.network === 'tiktok') {
+      if (a.network === 'youtube' || a.network === 'tiktok' || a.network === 'pinterest') {
         const token = await getAccess(a.network, a.id, opts.f);
         if (a.network === 'youtube') { const c = await channel(token, opts.f); n = c.followers; posts = c.uploads ? await youtubePosts(a.ext_id, c.uploads, since, token, opts.f) : []; }
+        else if (a.network === 'pinterest') { const pr = await pinProfile(token, opts.f); n = pr.followers; const boards = await pinBoards(token, opts.f).catch(() => a.boards ?? []); posts = await pinterestPosts(a.ext_id, boards, since, token, opts.f); }
         else { n = (await profile(token, opts.f)).followers; posts = await tiktokPosts(a.ext_id, since, token, opts.f); }
       } else {
         posts = a.network === 'facebook' ? await facebookPosts(a.ext_id, since, user, opts.f) : await instagramPosts(a.ext_id, a.page_id, since, user, opts.f);

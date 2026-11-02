@@ -4,6 +4,7 @@ export const BIZ = [
   { id: 'insafia', name: 'Insafia', color: '#A34B3B' },
   { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
   { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },
+  { id: 'personalbrand', name: 'Imran Hossain Alif — Personal Brand', color: '#0891B2' },
   { id: 'itevs', name: 'Itevs Digital', color: '#1F6FB8' },
   { id: 'hajj', name: 'Hajj/Umrah + Real Estate', color: '#7C3AED' },
   { id: 'others', name: 'Onnanno', color: '#5F7A74' },

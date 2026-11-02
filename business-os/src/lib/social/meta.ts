@@ -7,7 +7,7 @@
 import { cfg, readSecret } from '../config';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
-export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok';
+export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'pinterest';
 export type Fetch = typeof fetch;
 
 export class GraphError extends Error {

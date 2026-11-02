@@ -6,6 +6,7 @@ import { isFull } from '@/lib/access';
 import { exchangeCode, type Provider } from '@/lib/social/oauth';
 import { channel } from '@/lib/social/youtube';
 import { profile } from '@/lib/social/tiktok';
+import { pinBoards, pinProfile } from '@/lib/social/pinterest';
 import { discoverAccounts, metaMe } from '@/lib/social/meta';
 
 const origin = (req: Request) => { const h = req.headers, host = h.get('x-forwarded-host') || h.get('host'); return host ? (h.get('x-forwarded-proto') || 'https') + '://' + host : new URL(req.url).origin; };
@@ -43,6 +44,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
       }
       if (!found.length) return page(false, 'Kono Facebook Page pawa jayni — je Facebook account diye login korechen sheta diye ekta Page manage thakte hobe. Page thakle abar connect kore Page ta select korun.', biz);
       return page(true, found.length + ' ta account connect hoyeche: ' + found.map((a) => a.name).join(', ') + '. Ei window bondho korun.', biz);
+    }
+    if (provider === 'pinterest') {
+      // Pinterest: the account's boards are saved with it — publishing defaults to the first board.
+      const info = await pinProfile(t.access_token);
+      const boards = await pinBoards(t.access_token).catch(() => []);
+      const id = 'pinterest_' + info.id;
+      await saveSecret('oauth:' + id, t);
+      await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'pinterest', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
+        boards, board_id: boards[0]?.id || '', scope: t.scope, active: true, connected_at: new Date().toISOString(), error: '' });
+      return page(true, 'Pinterest account "@' + info.username + '" connect hoyeche' + (boards.length ? ' (' + boards.length + ' ta board, prothom board "' + boards[0].name + '" e pin jabe)' : ' (kono board pawa jayni — Pinterest e ekta board banan)') + '. Ei window bondho korun.', st.business);
     }
     const info = provider === 'youtube' ? await channel(t.access_token) : await profile(t.access_token);
     const id = provider + '_' + info.id;

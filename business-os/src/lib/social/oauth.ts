@@ -1,10 +1,10 @@
-// "Login with Google / TikTok / Facebook" for YouTube, TikTok and Meta (Facebook + Instagram) accounts.
+// "Login with Google / TikTok / Facebook / Pinterest" for YouTube, TikTok, Meta (Facebook + Instagram) and Pinterest accounts.
 // Tokens are stored encrypted (config.saveSecret), never in docs (docs are synced to browsers).
-// getAccess() refreshes an expired access token (YouTube/TikTok); the Meta token is shared, see meta.ts.
+// getAccess() refreshes an expired access token (YouTube/TikTok/Pinterest); the Meta token is shared, see meta.ts.
 import { cfg, readSecret, saveSecret } from '../config';
 import { META_SCOPES, metaAuthUrl, metaExchangeCode } from './meta';
 
-export type Provider = 'youtube' | 'tiktok' | 'meta';
+export type Provider = 'youtube' | 'tiktok' | 'meta' | 'pinterest';
 export type Tokens = { access_token: string; refresh_token?: string; expires_at: number; scope?: string; open_id?: string };
 
 export const redirectUri = (origin: string, p: Provider) => (process.env.PUBLIC_URL || origin).replace(/\/$/, '') + '/api/social/oauth/' + p + '/callback';
@@ -12,17 +12,23 @@ export const SCOPES: Record<Provider, string> = {
   youtube: 'https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly',
   tiktok: 'user.info.basic,user.info.profile,user.info.stats,video.list,video.upload,video.publish',
   meta: META_SCOPES.join(','),
+  pinterest: 'boards:read,boards:write,pins:read,pins:write,user_accounts:read',
 };
 
 async function creds(p: Provider) {
-  const [id, secret] = p === 'youtube' ? [await cfg('YOUTUBE_CLIENT_ID'), await cfg('YOUTUBE_CLIENT_SECRET')] : p === 'tiktok' ? [await cfg('TIKTOK_CLIENT_KEY'), await cfg('TIKTOK_CLIENT_SECRET')] : [await cfg('META_APP_ID'), await cfg('META_APP_SECRET')];
-  if (!id || !secret) throw Object.assign(new Error((p === 'youtube' ? 'YouTube (Google) client ID/secret' : p === 'tiktok' ? 'TikTok client key/secret' : 'Meta App ID/secret') + ' Settings e boshano nai'), { status: 400, code: 'not_connected' });
+  const [id, secret] = p === 'youtube' ? [await cfg('YOUTUBE_CLIENT_ID'), await cfg('YOUTUBE_CLIENT_SECRET')] : p === 'tiktok' ? [await cfg('TIKTOK_CLIENT_KEY'), await cfg('TIKTOK_CLIENT_SECRET')] : p === 'pinterest' ? [await cfg('PINTEREST_APP_ID'), await cfg('PINTEREST_APP_SECRET')] : [await cfg('META_APP_ID'), await cfg('META_APP_SECRET')];
+  if (!id || !secret) throw Object.assign(new Error((p === 'youtube' ? 'YouTube (Google) client ID/secret' : p === 'tiktok' ? 'TikTok client key/secret' : p === 'pinterest' ? 'Pinterest App ID/secret' : 'Meta App ID/secret') + ' Settings e boshano nai'), { status: 400, code: 'not_connected' });
   return { id, secret };
 }
 
 export async function authUrl(p: Provider, state: string, origin: string) {
   const { id } = await creds(p);
   if (p === 'meta') return metaAuthUrl(id, redirectUri(origin, p), state);
+  if (p === 'pinterest') {
+    const u = new URL('https://www.pinterest.com/oauth/');
+    for (const [k, v] of Object.entries({ client_id: id, redirect_uri: redirectUri(origin, p), response_type: 'code', scope: SCOPES.pinterest, state })) u.searchParams.set(k, v);
+    return u.toString();
+  }
   const u = new URL(p === 'youtube' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://www.tiktok.com/v2/auth/authorize/');
   const q = p === 'youtube'
     ? { client_id: id, redirect_uri: redirectUri(origin, p), response_type: 'code', scope: SCOPES.youtube, access_type: 'offline', prompt: 'consent', include_granted_scopes: 'true', state }
@@ -33,6 +39,13 @@ export async function authUrl(p: Provider, state: string, origin: string) {
 
 async function tokenCall(p: Provider, body: Record<string, string>, f: typeof fetch = fetch): Promise<Tokens> {
   const { id, secret } = await creds(p);
+  if (p === 'pinterest') {
+    // Pinterest's token endpoint takes the app credentials as HTTP Basic auth, not in the form body.
+    const r = await f('https://api.pinterest.com/v5/oauth/token', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded', Authorization: 'Basic ' + Buffer.from(id + ':' + secret).toString('base64') }, body: new URLSearchParams(body), signal: AbortSignal.timeout(30000) });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error('Pinterest: ' + (j.error_description || j.message || j.error || r.status));
+    return { access_token: j.access_token, refresh_token: j.refresh_token ?? body.refresh_token, expires_at: Date.now() + (Number(j.expires_in) || 2592000) * 1000, scope: j.scope };
+  }
   const form = new URLSearchParams(p === 'youtube' ? { client_id: id, client_secret: secret, ...body } : { client_key: id, client_secret: secret, ...body });
   const r = await f(p === 'youtube' ? 'https://oauth2.googleapis.com/token' : 'https://open.tiktokapis.com/v2/oauth/token/', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form, signal: AbortSignal.timeout(30000) });
   const j: any = await r.json().catch(() => ({}));

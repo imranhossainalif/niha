@@ -18,7 +18,7 @@ export const GET = handle(async (req: Request, { params }: Ctx) => {
   needBiz(p, business);
   const connected = (await db(p).collection('social_accounts').where('business', '==', business).limit(100).get()).map((s) => ({ id: s.id, ...(s.data as SocialAccount) }));
   // which logins are set up in Settings (no values)
-  const providers = { meta: !!((await cfg('META_SOCIAL_TOKEN')) || (await cfg('META_ADS_TOKEN')) || (await metaUserToken())), metaApp: !!((await cfg('META_APP_ID')) && (await cfg('META_APP_SECRET'))), metaUser: !!(await metaUserToken()), youtube: !!((await cfg('YOUTUBE_CLIENT_ID')) && (await cfg('YOUTUBE_CLIENT_SECRET'))), tiktok: !!((await cfg('TIKTOK_CLIENT_KEY')) && (await cfg('TIKTOK_CLIENT_SECRET'))) };
+  const providers = { meta: !!((await cfg('META_SOCIAL_TOKEN')) || (await cfg('META_ADS_TOKEN')) || (await metaUserToken())), metaApp: !!((await cfg('META_APP_ID')) && (await cfg('META_APP_SECRET'))), metaUser: !!(await metaUserToken()), youtube: !!((await cfg('YOUTUBE_CLIENT_ID')) && (await cfg('YOUTUBE_CLIENT_SECRET'))), tiktok: !!((await cfg('TIKTOK_CLIENT_KEY')) && (await cfg('TIKTOK_CLIENT_SECRET'))), pinterest: !!((await cfg('PINTEREST_APP_ID')) && (await cfg('PINTEREST_APP_SECRET'))) };
   const callbackBase = (process.env.PUBLIC_URL || new URL(req.url).origin).replace(/\/$/, '') + '/api/social/oauth/';
   if (new URL(req.url).searchParams.get('discover') !== '1') return json({ connected, providers, callbackBase });
   adminOnly(p);

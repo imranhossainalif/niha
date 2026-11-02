@@ -67,23 +67,38 @@ export function fieldValue(field: string, row: Row, extra: { profile?: string; s
 const fieldList = (f: SmInput['fields']) => (Array.isArray(f) ? f : String(f).split(',')).map((s) => s.trim()).filter(Boolean);
 const accounts = (a: SmInput['ds_accounts']) => (Array.isArray(a) ? a : String(a || '').split(',')).map((s) => s.trim()).filter(Boolean).map((s) => (s.startsWith('act_') ? s : 'act_' + s));
 
+const tokenList = (t: string | string[]) => (Array.isArray(t) ? t : [t]).map((s) => (s || '').trim()).filter(Boolean);
+
 /** "FA": ad account insights, one row per account / day / ad depending on the fields asked for. */
-export async function metaAdsQuery(input: SmInput, token: string) {
+export async function metaAdsQuery(input: SmInput, token: string | string[]) {
+  const tokens = tokenList(token);
   const fields = fieldList(input.fields);
   const adLevel = fields.some((f) => f === 'ad_name' || f === 'adcampaign_name' || f === 'adstatus');
   const daily = fields.includes('Date');
   const metaFields = ['spend', 'impressions', 'cpm', 'frequency', 'inline_link_click_ctr', 'actions', ...(adLevel ? ['ad_id', 'ad_name', 'campaign_name'] : [])];
   const rows: unknown[][] = [];
   for (const act of accounts(input.ds_accounts)) {
-    const acc = await get(`${GRAPH}/${act}?fields=name&access_token=${encodeURIComponent(token)}`);
-    const status: Record<string, string> = {};
-    if (fields.includes('adstatus')) for (const ad of await all(`${GRAPH}/${act}/ads?fields=id,effective_status&limit=500&access_token=${encodeURIComponent(token)}`)) status[ad.id] = ad.effective_status;
-    const url = `${GRAPH}/${act}/insights?level=${adLevel ? 'ad' : 'account'}&fields=${metaFields.join(',')}&${timeParams(input)}`
-      + (daily ? '&time_increment=1' : '') + `&limit=500&access_token=${encodeURIComponent(token)}`;
-    for (const r of await all(url, input.max_rows ?? 5000)) {
-      if (input.settings?.exclude_zero_impressions && !Number(r.impressions)) continue;
-      rows.push(fields.map((f) => fieldValue(f, r, { profile: acc.name, status: status[r.ad_id] })));
+    // Try each token in order: an account owned by another business portfolio answers
+    // #200 on the first token and returns data on the second.
+    let firstErr: unknown = null; let done = false;
+    for (const tok of tokens) {
+      try {
+        const enc = encodeURIComponent(tok);
+        const acc = await get(`${GRAPH}/${act}?fields=name&access_token=${enc}`);
+        const status: Record<string, string> = {};
+        if (fields.includes('adstatus')) for (const ad of await all(`${GRAPH}/${act}/ads?fields=id,effective_status&limit=500&access_token=${enc}`)) status[ad.id] = ad.effective_status;
+        const url = `${GRAPH}/${act}/insights?level=${adLevel ? 'ad' : 'account'}&fields=${metaFields.join(',')}&${timeParams(input)}`
+          + (daily ? '&time_increment=1' : '') + `&limit=500&access_token=${enc}`;
+        const mine: unknown[][] = [];
+        for (const r of await all(url, input.max_rows ?? 5000)) {
+          if (input.settings?.exclude_zero_impressions && !Number(r.impressions)) continue;
+          mine.push(fields.map((f) => fieldValue(f, r, { profile: acc.name, status: status[r.ad_id] })));
+        }
+        rows.push(...mine);
+        done = true; break;
+      } catch (e) { if (!firstErr) firstErr = e; }
     }
+    if (!done) throw firstErr;
   }
   return { status: 'completed', requested_field_ids: fields, data: [fields, ...rows.slice(0, input.max_rows ?? 5000)] };
 }
@@ -94,12 +109,19 @@ const PAGE_METRIC: Record<string, string> = {
 };
 
 /** "FB": page totals over the range (followers = current count). Metrics Meta no longer serves come back as 0. */
-export async function metaPageQuery(input: SmInput, token: string) {
+export async function metaPageQuery(input: SmInput, token: string | string[]) {
+  const tokens = tokenList(token);
   const fields = fieldList(input.fields);
   const rows: unknown[][] = [];
   for (const id of (Array.isArray(input.ds_accounts) ? input.ds_accounts : String(input.ds_accounts || '').split(',')).map((s) => String(s).trim()).filter(Boolean)) {
-    const page = await get(`${GRAPH}/${id}?fields=name,followers_count,access_token&access_token=${encodeURIComponent(token)}`);
-    const ptok = page.access_token || token; // page insights need a page token; a system user with page access gets one here
+    // Same per-token fallback as the ads query: try each token until one can read the page.
+    let page: Record<string, any> | null = null; let usedTok = tokens[0]; let firstErr: unknown = null;
+    for (const tok of tokens) {
+      try { page = await get(`${GRAPH}/${id}?fields=name,followers_count,access_token&access_token=${encodeURIComponent(tok)}`); usedTok = tok; break; }
+      catch (e) { if (!firstErr) firstErr = e; }
+    }
+    if (!page) throw firstErr;
+    const ptok = page.access_token || usedTok; // page insights need a page token; a system user with page access gets one here
     const vals: Record<string, number> = {};
     const want = fields.filter((f) => PAGE_METRIC[f]);
     for (const f of want) {
@@ -113,9 +135,11 @@ export async function metaPageQuery(input: SmInput, token: string) {
   return { status: 'completed', requested_field_ids: fields, data: [fields, ...rows] };
 }
 
-/** Meta answers FA/FB when META_ADS_TOKEN is set; null means "not handled here". */
+/** Meta answers FA/FB when META_ADS_TOKEN is set; null means "not handled here".
+ *  META_ADS_TOKEN_2 (optional) covers accounts owned by a second business portfolio:
+ *  each account/page is tried with the first token, then the second. */
 export async function metaQuery(input: SmInput) {
-  const token = await cfg('META_ADS_TOKEN');
-  if (!token || (input.ds_id !== 'FA' && input.ds_id !== 'FB')) return null;
-  return input.ds_id === 'FA' ? metaAdsQuery(input, token) : metaPageQuery(input, token);
+  const tokens = tokenList([(await cfg('META_ADS_TOKEN')) || '', (await cfg('META_ADS_TOKEN_2')) || '']);
+  if (!tokens.length || (input.ds_id !== 'FA' && input.ds_id !== 'FB')) return null;
+  return input.ds_id === 'FA' ? metaAdsQuery(input, tokens) : metaPageQuery(input, tokens);
 }

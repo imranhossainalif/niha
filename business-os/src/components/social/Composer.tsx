@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, Label, Modal, Seg, TYPE_LABEL, upload, useToast, WEEKDAYS, type Account, type MediaRef, type Post, type PostOptions } from './ui';
 
-const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200, pinterest: 800 };
+const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200, pinterest: 800, linkedin: 3000 };
 const toLocalInput = (iso?: string | null) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const isVideo = (m: { mime: string }) => m.mime.startsWith('video/');
 export type Draft = Partial<Post> & { idea_label?: string };
@@ -254,6 +254,11 @@ export function PostPreview({ a, text, media, link, title }: { a: Account; text:
         <span className="row muted xs"><Avatar a={a} size={22} />{a.name} · ekhoni</span><span className="muted xs clamp3" style={{ whiteSpace: 'pre-wrap' }}>{text}</span></div>
     </div>);
   const body = <p style={{ whiteSpace: 'pre-wrap', fontSize: 14, margin: 0 }}>{a.network === 'instagram' ? <><b>{name}</b> {text}</> : text}</p>;
+  if (a.network === 'linkedin') return (
+    <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="row" style={{ padding: 10 }}><Avatar a={a} size={34} /><div><b className="sm-t">{name}</b><div className="muted xs">LinkedIn · Ekhon · 🌐</div></div></div>
+      <div style={{ padding: '0 12px 12px' }}>{body}{link && <div className="muted xs" style={{ marginTop: 8 }}>🔗 {link}</div>}<div className="muted xs" style={{ marginTop: 8 }}>Shudhu lekha jabe — chobi/video ekhono na.</div></div>
+    </div>);
   return (
     <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="row" style={{ padding: 10 }}><Avatar a={a} size={34} /><div><b className="sm-t">{name}</b><div className="muted xs">{a.network === 'instagram' ? 'Instagram' : 'Ekhon · 🌐'}</div></div></div>

@@ -11,7 +11,8 @@ import { getAccess } from '../social/oauth';
 import { channel, publishYouTube, youtubePosts, type YtOptions } from '../social/youtube';
 import { profile, publishTikTok, tiktokPosts, type TtOptions } from '../social/tiktok';
 import { pinBoards, pinProfile, pinterestPosts, publishPinterest, type PinBoard } from '../social/pinterest';
-import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, publishFacebook, publishInstagram, socialToken, type Fetch, type Network } from '../social/meta';
+import { liProfile, publishLinkedIn } from '../social/linkedin';
+import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, publishFacebook, publishInstagram, socialToken, type Fetch, type Network, type PostStat } from '../social/meta';
 import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
 import { recordUsage } from '../aiUsage';
@@ -50,6 +51,7 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
       const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
         : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
         : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
+        : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f)
         : await publishVideo(a.network, a.id, post, input.text, f);
       targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
     } catch (e) {
@@ -99,10 +101,11 @@ export async function socialSync(opts: { days?: number; f?: Fetch } = {}) {
   const res: Record<string, unknown> = {};
   for (const a of list) {
     try {
-      let posts, n: number | null;
-      if (a.network === 'youtube' || a.network === 'tiktok' || a.network === 'pinterest') {
+      let posts: PostStat[], n: number | null;
+      if (a.network === 'youtube' || a.network === 'tiktok' || a.network === 'pinterest' || a.network === 'linkedin') {
         const token = await getAccess(a.network, a.id, opts.f);
         if (a.network === 'youtube') { const c = await channel(token, opts.f); n = c.followers; posts = c.uploads ? await youtubePosts(a.ext_id, c.uploads, since, token, opts.f) : []; }
+        else if (a.network === 'linkedin') { await liProfile(token, opts.f); n = null; posts = []; } // token check only: OIDC userinfo has no follower count, and reading posts back needs the restricted r_member_social scope
         else if (a.network === 'pinterest') { const pr = await pinProfile(token, opts.f); n = pr.followers; const boards = await pinBoards(token, opts.f).catch(() => a.boards ?? []); posts = await pinterestPosts(a.ext_id, boards, since, token, opts.f); }
         else { n = (await profile(token, opts.f)).followers; posts = await tiktokPosts(a.ext_id, since, token, opts.f); }
       } else {

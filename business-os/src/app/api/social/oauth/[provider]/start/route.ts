@@ -8,10 +8,10 @@ import { authUrl, type Provider } from '@/lib/social/oauth';
 
 const origin = (req: Request) => { const h = req.headers, host = h.get('x-forwarded-host') || h.get('host'); return host ? (h.get('x-forwarded-proto') || 'https') + '://' + host : new URL(req.url).origin; };
 
-/** Opens Google / TikTok / Facebook / Pinterest login for connecting a YouTube channel, TikTok account, Facebook Pages + Instagram, or a Pinterest account (owner/admin). */
+/** Opens Google / TikTok / Facebook / Pinterest / LinkedIn login for connecting a YouTube channel, TikTok account, Facebook Pages + Instagram, a Pinterest account, or a LinkedIn profile (owner/admin). */
 export const GET = handle(async (req: Request, { params }: { params: Promise<{ provider: string }> }) => {
   const provider = (await params).provider as Provider;
-  if (provider !== 'youtube' && provider !== 'tiktok' && provider !== 'meta' && provider !== 'pinterest') throw Object.assign(new Error('Unknown provider'), { status: 404, code: 'not_found' });
+  if (provider !== 'youtube' && provider !== 'tiktok' && provider !== 'meta' && provider !== 'pinterest' && provider !== 'linkedin') throw Object.assign(new Error('Unknown provider'), { status: 404, code: 'not_found' });
   const p = await needPrincipal(req, 'write');
   if (!isFull(p)) throw Object.assign(new Error('Account connect shudhu owner/admin korte pare'), { status: 403, code: 'permission_denied' });
   const business = new URL(req.url).searchParams.get('business') || 'kidscare';

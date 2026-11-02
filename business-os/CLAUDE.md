@@ -61,7 +61,9 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   Meta does not allow posting to Facebook groups by API: groups are suggestions only.
   YouTube (`src/lib/social/youtube.ts`, Google OAuth) and TikTok (`tiktok.ts`, TikTok OAuth, FILE_UPLOAD chunks, inbox draft or
   direct post) log in through `/api/social/oauth/[provider]/start|callback`; tokens via `saveSecret('oauth:<account>')` (encrypted,
-  never in docs), refreshed by `oauth.getAccess`. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
+  never in docs), refreshed by `oauth.getAccess`. Pinterest (`pinterest.ts`, image pins) and LinkedIn (`linkedin.ts`, OIDC sign-in +
+  Posts API) use the same routes; LinkedIn v1 posts TEXT only to the member's own profile (no company pages, no media upload) and
+  its ~60-day member token has no refresh token at this product tier — on expiry `getAccess` asks for a one-click reconnect. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
   `/legal/privacy` and `/legal/terms` exist because TikTok/Google ask for them.
 - **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
   the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,

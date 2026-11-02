@@ -7,6 +7,7 @@ import { exchangeCode, type Provider } from '@/lib/social/oauth';
 import { channel } from '@/lib/social/youtube';
 import { profile } from '@/lib/social/tiktok';
 import { pinBoards, pinProfile } from '@/lib/social/pinterest';
+import { liProfile } from '@/lib/social/linkedin';
 import { discoverAccounts, metaMe } from '@/lib/social/meta';
 
 const origin = (req: Request) => { const h = req.headers, host = h.get('x-forwarded-host') || h.get('host'); return host ? (h.get('x-forwarded-proto') || 'https') + '://' + host : new URL(req.url).origin; };
@@ -54,6 +55,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
       await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'pinterest', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
         boards, board_id: boards[0]?.id || '', scope: t.scope, active: true, connected_at: new Date().toISOString(), error: '' });
       return page(true, 'Pinterest account "@' + info.username + '" connect hoyeche' + (boards.length ? ' (' + boards.length + ' ta board, prothom board "' + boards[0].name + '" e pin jabe)' : ' (kono board pawa jayni — Pinterest e ekta board banan)') + '. Ei window bondho korun.', st.business);
+    }
+    if (provider === 'linkedin') {
+      // LinkedIn: the member's own profile (OIDC sub is the identity). The token has no refresh
+      // token at this tier — it lives ~60 days in the secret, then the owner reconnects.
+      const info = await liProfile(t.access_token);
+      const id = 'linkedin_' + info.id;
+      await saveSecret('oauth:' + id, t);
+      await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'linkedin', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
+        scope: t.scope, token_expires_at: new Date(t.expires_at).toISOString(), active: true, connected_at: new Date().toISOString(), error: '' });
+      return page(true, 'LinkedIn profile "' + info.name + '" connect hoyeche. Token ~60 din thakbe — meyad shesh hole ek click e abar connect korte hobe. Ei window bondho korun.', st.business);
     }
     const info = provider === 'youtube' ? await channel(t.access_token) : await profile(t.access_token);
     const id = provider + '_' + info.id;

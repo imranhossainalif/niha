@@ -121,16 +121,28 @@ async function metaPageCheck(): Promise<Health> {
 
 const AD_STATUS: Record<number, [string, Status]> = { 1: ['Active', 'ok'], 2: ['Disabled', 'bad'], 3: ['Unsettled (bill baki)', 'bad'], 7: ['Risk review', 'warn'], 8: ['Pending settlement', 'warn'], 9: ['Grace period (bill dite hobe)', 'warn'], 100: ['Pending closure', 'bad'], 101: ['Closed', 'bad'] };
 async function metaAdsCheck(): Promise<Health> {
-  const base = { id: 'meta_ads', name: 'Meta Ads (ad data, Supermetrics er free bikolpo)', keys: ['META_ADS_TOKEN'] as ConfigKey[],
+  const base = { id: 'meta_ads', name: 'Meta Ads (ad data, Supermetrics er free bikolpo)', keys: ['META_ADS_TOKEN', 'META_ADS_TOKEN_2'] as ConfigKey[],
     links: [{ label: 'System users', url: 'https://business.facebook.com/settings/system-users' }, { label: 'Billing & payments', url: 'https://business.facebook.com/billing_hub/payment_settings' }] };
   const token = await cfg('META_ADS_TOKEN');
-  if (!token) return { ...base, status: 'off', summary: 'Ads token nai — Marketing tab e ad er khoroch/result ashbe na.', fix: 'Business settings → System users → business-os → Generate token (ads_read, pages_read_engagement), nicher form e boshan.' };
-  const t = await debugToken(token);
+  const token2 = await cfg('META_ADS_TOKEN_2');
+  if (!token && !token2) return { ...base, status: 'off', summary: 'Ads token nai — Marketing tab e ad er khoroch/result ashbe na.', fix: 'Business settings → System users → business-os → Generate token (ads_read, pages_read_engagement), nicher form e boshan.' };
+  const primary = (token || token2) as string;
+  const t = await debugToken(primary);
   if (!t.is_valid) return { ...base, status: 'bad', summary: 'Ads token kaj korche na.', details: [['Meta bolche', t.error?.message || 'invalid token']], fix: 'Notun system user token banan.' };
   const tl = tokenLines(t);
-  const { r, j } = await get(`${GRAPH}/me/adaccounts?fields=name,account_status,disable_reason,amount_spent,spend_cap,balance,currency&limit=50&access_token=${encodeURIComponent(token)}`);
-  const accts = (j?.data ?? []) as { id: string; name: string; account_status: number; amount_spent?: string; spend_cap?: string; balance?: string; currency?: string }[];
+  type Acct = { id: string; name: string; account_status: number; amount_spent?: string; spend_cap?: string; balance?: string; currency?: string };
+  const acctUrl = (tok: string) => `${GRAPH}/me/adaccounts?fields=name,account_status,disable_reason,amount_spent,spend_cap,balance,currency&limit=50&access_token=${encodeURIComponent(tok)}`;
+  const { r, j } = await get(acctUrl(primary));
+  const accts = (j?.data ?? []) as Acct[];
   const statuses: Status[] = [tl.status]; const notes: string[] = tl.note ? [tl.note] : [];
+  if (token && token2) {
+    const t2 = await debugToken(token2);
+    if (!t2.is_valid) { statuses.push('warn'); notes.push('Ads token 2 kaj korche na: ' + (t2.error?.message || 'invalid token')); }
+    else {
+      const seen = new Set(accts.map((a) => a.id));
+      for (const a of ((await get(acctUrl(token2))).j?.data ?? []) as Acct[]) if (!seen.has(a.id)) accts.push(a);
+    }
+  }
   const details: [string, string][] = [];
   const limits: Limit[] = [];
   for (const a of accts) {
@@ -273,7 +285,7 @@ async function socialCheck(): Promise<Health> {
   const own = await cfg('META_SOCIAL_TOKEN');
   const token = own || (await cfg('META_ADS_TOKEN'));
   const accts = (await db().collection('social_accounts').limit(100).get()).map((x) => x.data as { name: string; network: string; active?: boolean; error?: string }).filter((a) => a.active !== false);
-  const NET: Record<string, string> = { facebook: 'FB ', instagram: 'IG ', youtube: 'YouTube ', tiktok: 'TikTok ', pinterest: 'Pinterest ' };
+  const NET: Record<string, string> = { facebook: 'FB ', instagram: 'IG ', youtube: 'YouTube ', tiktok: 'TikTok ' };
   if (!token) return { ...base, status: accts.length ? 'ok' : 'off', summary: accts.length ? accts.length + ' ta account connect (Facebook/Instagram er token nai).' : 'Social token nai — post/schedule kora jabe na.', fix: 'Kids Care → Social Media → Accounts e step gulo dekhun.' };
   const t = await debugToken(token);
   if (!t.is_valid) return { ...base, status: 'bad', summary: 'Social token kaj korche na.', details: [['Meta bolche', t.error?.message || 'invalid token']], fix: 'Notun system user token banan.' };

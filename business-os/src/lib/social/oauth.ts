@@ -1,10 +1,13 @@
-// "Login with Google / TikTok / Facebook / Pinterest" for YouTube, TikTok, Meta (Facebook + Instagram) and Pinterest accounts.
+// "Login with Google / TikTok / Facebook / Pinterest / LinkedIn" for YouTube, TikTok, Meta (Facebook + Instagram),
+// Pinterest and LinkedIn accounts.
 // Tokens are stored encrypted (config.saveSecret), never in docs (docs are synced to browsers).
 // getAccess() refreshes an expired access token (YouTube/TikTok/Pinterest); the Meta token is shared, see meta.ts.
+// LinkedIn member tokens (~60 days) come with no refresh token at this product tier, so an expired one
+// fails getAccess with "abar connect korun" and the owner reconnects with one click.
 import { cfg, readSecret, saveSecret } from '../config';
 import { META_SCOPES, metaAuthUrl, metaExchangeCode } from './meta';
 
-export type Provider = 'youtube' | 'tiktok' | 'meta' | 'pinterest';
+export type Provider = 'youtube' | 'tiktok' | 'meta' | 'pinterest' | 'linkedin';
 export type Tokens = { access_token: string; refresh_token?: string; expires_at: number; scope?: string; open_id?: string };
 
 export const redirectUri = (origin: string, p: Provider) => (process.env.PUBLIC_URL || origin).replace(/\/$/, '') + '/api/social/oauth/' + p + '/callback';
@@ -13,11 +16,12 @@ export const SCOPES: Record<Provider, string> = {
   tiktok: 'user.info.basic,user.info.profile,user.info.stats,video.list,video.upload,video.publish',
   meta: META_SCOPES.join(','),
   pinterest: 'boards:read,boards:write,pins:read,pins:write,user_accounts:read',
+  linkedin: 'openid profile w_member_social',
 };
 
 async function creds(p: Provider) {
-  const [id, secret] = p === 'youtube' ? [await cfg('YOUTUBE_CLIENT_ID'), await cfg('YOUTUBE_CLIENT_SECRET')] : p === 'tiktok' ? [await cfg('TIKTOK_CLIENT_KEY'), await cfg('TIKTOK_CLIENT_SECRET')] : p === 'pinterest' ? [await cfg('PINTEREST_APP_ID'), await cfg('PINTEREST_APP_SECRET')] : [await cfg('META_APP_ID'), await cfg('META_APP_SECRET')];
-  if (!id || !secret) throw Object.assign(new Error((p === 'youtube' ? 'YouTube (Google) client ID/secret' : p === 'tiktok' ? 'TikTok client key/secret' : p === 'pinterest' ? 'Pinterest App ID/secret' : 'Meta App ID/secret') + ' Settings e boshano nai'), { status: 400, code: 'not_connected' });
+  const [id, secret] = p === 'youtube' ? [await cfg('YOUTUBE_CLIENT_ID'), await cfg('YOUTUBE_CLIENT_SECRET')] : p === 'tiktok' ? [await cfg('TIKTOK_CLIENT_KEY'), await cfg('TIKTOK_CLIENT_SECRET')] : p === 'pinterest' ? [await cfg('PINTEREST_APP_ID'), await cfg('PINTEREST_APP_SECRET')] : p === 'linkedin' ? [await cfg('LINKEDIN_CLIENT_ID'), await cfg('LINKEDIN_CLIENT_SECRET')] : [await cfg('META_APP_ID'), await cfg('META_APP_SECRET')];
+  if (!id || !secret) throw Object.assign(new Error((p === 'youtube' ? 'YouTube (Google) client ID/secret' : p === 'tiktok' ? 'TikTok client key/secret' : p === 'pinterest' ? 'Pinterest App ID/secret' : p === 'linkedin' ? 'LinkedIn client ID/secret' : 'Meta App ID/secret') + ' Settings e boshano nai'), { status: 400, code: 'not_connected' });
   return { id, secret };
 }
 
@@ -27,6 +31,11 @@ export async function authUrl(p: Provider, state: string, origin: string) {
   if (p === 'pinterest') {
     const u = new URL('https://www.pinterest.com/oauth/');
     for (const [k, v] of Object.entries({ client_id: id, redirect_uri: redirectUri(origin, p), response_type: 'code', scope: SCOPES.pinterest, state })) u.searchParams.set(k, v);
+    return u.toString();
+  }
+  if (p === 'linkedin') {
+    const u = new URL('https://www.linkedin.com/oauth/v2/authorization');
+    for (const [k, v] of Object.entries({ client_id: id, redirect_uri: redirectUri(origin, p), response_type: 'code', scope: SCOPES.linkedin, state })) u.searchParams.set(k, v);
     return u.toString();
   }
   const u = new URL(p === 'youtube' ? 'https://accounts.google.com/o/oauth2/v2/auth' : 'https://www.tiktok.com/v2/auth/authorize/');
@@ -45,6 +54,14 @@ async function tokenCall(p: Provider, body: Record<string, string>, f: typeof fe
     const j: any = await r.json().catch(() => ({}));
     if (!r.ok || j.error) throw new Error('Pinterest: ' + (j.error_description || j.message || j.error || r.status));
     return { access_token: j.access_token, refresh_token: j.refresh_token ?? body.refresh_token, expires_at: Date.now() + (Number(j.expires_in) || 2592000) * 1000, scope: j.scope };
+  }
+  if (p === 'linkedin') {
+    // LinkedIn's token endpoint takes client_id + client_secret in the form body; member tokens
+    // last ~60 days and this tier returns no refresh token (reconnect when expired).
+    const r = await f('https://www.linkedin.com/oauth/v2/accessToken', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: id, client_secret: secret, ...body }), signal: AbortSignal.timeout(30000) });
+    const j: any = await r.json().catch(() => ({}));
+    if (!r.ok || j.error) throw new Error('LinkedIn: ' + (j.error_description || j.error || r.status));
+    return { access_token: j.access_token, refresh_token: j.refresh_token ?? body.refresh_token, expires_at: Date.now() + (Number(j.expires_in) || 5184000) * 1000, scope: j.scope };
   }
   const form = new URLSearchParams(p === 'youtube' ? { client_id: id, client_secret: secret, ...body } : { client_key: id, client_secret: secret, ...body });
   const r = await f(p === 'youtube' ? 'https://oauth2.googleapis.com/token' : 'https://open.tiktokapis.com/v2/oauth/token/', { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: form, signal: AbortSignal.timeout(30000) });

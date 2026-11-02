@@ -272,6 +272,9 @@ PATCHES.push(
 
 /* ===== Personal Brand business (owner request 2026-11-02: a home for the owner's personal-profile
    social accounts — the LRF 90-day plan posts from personal profiles, not the company page).
+   Renamed the same evening at the owner's insistence: in the Business list it must read exactly
+   "Imran Hossain Alif", like the other business names — the "Personal Brand" label confused him.
+   The id stays 'personalbrand'; only display names changed, no data touched.
    A REGULAR business: it keeps the standard BTABS set, which already includes the Social Media tab,
    so only the BIZ list and the sidebar item need the new entry. The native /social/<business> page
    and its APIs are business-generic and validate against BIZ_IDS (src/lib/business.ts), which gains
@@ -286,7 +289,7 @@ PATCHES.push(
   { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
   { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },`,
     replace: `  { id: 'insafia', name: 'Insafia', color: '#A34B3B' },
-  { id: 'personalbrand', name: 'Imran Hossain Alif — Personal Brand', color: '#0891B2' },
+  { id: 'personalbrand', name: 'Imran Hossain Alif', color: '#0891B2' },
   { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
   { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },`,
   },
@@ -294,6 +297,7 @@ PATCHES.push(
     name: 'Personal Brand: add the sidebar item under LocalServiceHQ',
     find: `      <button class="nav" data-go="biz:localservicehq"><svg viewBox="0 0 16 16" fill="#4ADE80"><circle cx="8" cy="8" r="4"/></svg>LocalServiceHQ</button>`,
     replace: `      <button class="nav" data-go="biz:localservicehq"><svg viewBox="0 0 16 16" fill="#4ADE80"><circle cx="8" cy="8" r="4"/></svg>LocalServiceHQ</button>
-      <button class="nav" data-go="biz:personalbrand"><svg viewBox="0 0 16 16" fill="#22D3EE"><circle cx="8" cy="8" r="4"/></svg>Personal Brand</button>`,
+      <button class="nav" data-go="biz:personalbrand"><svg viewBox="0 0 16 16" fill="#22D3EE"><circle cx="8" cy="8" r="4"/></svg>Imran Hossain Alif</button>`,
   },
 );
+

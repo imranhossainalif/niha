@@ -4,7 +4,7 @@
 // on the fly, so no page token is ever stored.
 // Facts this follows: Meta removed posting to Groups from the API (2024); Instagram needs a public media URL and
 // can't post text only; Facebook Page post metrics need pages_read_engagement + read_insights.
-import { cfg, readSecret } from '../config';
+import { cfg, listSecretNames, readSecret } from '../config';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
 export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'pinterest' | 'linkedin';
@@ -86,15 +86,54 @@ export async function metaUserToken(): Promise<string | undefined> {
   return t && t.access_token && t.expires_at > Date.now() + 60e3 ? t.access_token : undefined;
 }
 
+/**
+ * Every one-click user token we hold, latest login first: 'meta:user' plus one per Facebook user from
+ * earlier logins ('meta:user:<fb id>', saved by the OAuth callback since this fix). Each Facebook login is
+ * limited to the Pages/assets chosen in that run's picker, so no single token can manage every Page —
+ * a Page token must be derivable from ANY of them, otherwise connecting a second business silently
+ * breaks the first business's publishing (the "Hoyni" outage of Nov 2026).
+ */
+export async function metaUserTokens(): Promise<string[]> {
+  const out: string[] = [];
+  const push = (t?: string) => { if (t && !out.includes(t)) out.push(t); };
+  push(await metaUserToken());
+  for (const name of await listSecretNames('meta:user:').catch(() => [] as string[])) {
+    const t = await readSecret<MetaTokens>(name).catch(() => null);
+    push(t && t.access_token && t.expires_at > Date.now() + 60e3 ? t.access_token : undefined);
+  }
+  return out;
+}
+
+/** All tokens publishing/analytics may try, in order: Settings system token, one-click logins, ads token. */
+export async function metaTokens(): Promise<string[]> {
+  const out: string[] = [];
+  const push = (t?: string) => { if (t && !out.includes(t)) out.push(t); };
+  push(await cfg('META_SOCIAL_TOKEN'));
+  for (const t of await metaUserTokens()) push(t);
+  push(await cfg('META_ADS_TOKEN'));
+  if (!out.length) throw Object.assign(new Error('Social media connect nai: Social Media → Accounts e "Facebook diye connect" chapun, ba Settings e Meta social token boshan'), { status: 400, code: 'not_connected' });
+  return out;
+}
+
 const pageTokens = new Map<string, { t: string; at: number }>();
-/** Page access token for a page the system user can manage (cached 30 min). */
-export async function pageToken(pageId: string, user: string, f?: Fetch): Promise<string> {
+/**
+ * Page access token for a page (cached 30 min). `user` may be a list of candidate user tokens — the
+ * first one that can manage this page wins, and if none can, the LAST Graph error is thrown (so the
+ * failure stored on the post is Meta's real message, not a generic one).
+ */
+export async function pageToken(pageId: string, user: string | string[], f?: Fetch): Promise<string> {
   const c = pageTokens.get(pageId);
   if (c && Date.now() - c.at < 30 * 60e3) return c.t;
-  const j = await graph('/' + pageId, { token: user, params: { fields: 'access_token' }, f });
-  if (!j.access_token) throw new GraphError('Page ' + pageId + ' er token pawa jayni: system user ke page e "Create content" access din');
-  pageTokens.set(pageId, { t: j.access_token, at: Date.now() });
-  return j.access_token;
+  let last: unknown;
+  for (const u of Array.isArray(user) ? user : [user]) {
+    try {
+      const j = await graph('/' + pageId, { token: u, params: { fields: 'access_token' }, f });
+      if (!j.access_token) throw new GraphError('Page ' + pageId + ' er token pawa jayni: system user ke page e "Create content" access din');
+      pageTokens.set(pageId, { t: j.access_token, at: Date.now() });
+      return j.access_token;
+    } catch (e) { last = e; }
+  }
+  throw last ?? new GraphError('Page ' + pageId + ' er token pawa jayni');
 }
 
 export type FoundAccount = { network: Network; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
@@ -116,7 +155,7 @@ export type PublishResult = { ext_post_id: string; permalink?: string };
 const isVideo = (m: Media) => m.mime.startsWith('video/');
 
 /** Publish now on a Facebook Page: text/link, one photo, several photos (album post), or one video. */
-export async function publishFacebook(pageId: string, input: PublishInput, user: string, f?: Fetch): Promise<PublishResult> {
+export async function publishFacebook(pageId: string, input: PublishInput, user: string | string[], f?: Fetch): Promise<PublishResult> {
   const token = await pageToken(pageId, user, f);
   const { text, media, link } = input;
   let id: string;
@@ -150,7 +189,7 @@ async function waitContainer(id: string, token: string, f?: Fetch, tries = 40) {
 }
 
 /** Publish now on Instagram: one photo, one video (as a Reel), or 2–10 items (carousel). */
-export async function publishInstagram(igId: string, pageId: string, input: PublishInput, user: string, f?: Fetch): Promise<PublishResult> {
+export async function publishInstagram(igId: string, pageId: string, input: PublishInput, user: string | string[], f?: Fetch): Promise<PublishResult> {
   const token = await pageToken(pageId, user, f);
   const { text, media } = input;
   if (!media.length) throw new GraphError('Instagram e shudhu lekha post hoy na — chobi ba video lagbe');
@@ -209,7 +248,7 @@ async function insights(id: string, metrics: string[], token: string, f?: Fetch)
   return out;
 }
 
-export async function facebookPosts(pageId: string, sinceIso: string, user: string, f?: Fetch, cap = 300): Promise<PostStat[]> {
+export async function facebookPosts(pageId: string, sinceIso: string, user: string | string[], f?: Fetch, cap = 300): Promise<PostStat[]> {
   const token = await pageToken(pageId, user, f);
   const rows = await graphAll('/' + pageId + '/posts', { token, f, params: { since: Math.floor(Date.parse(sinceIso) / 1000), limit: 50,
     fields: 'id,created_time,message,permalink_url,full_picture,status_type,attachments{media_type,type,subattachments.limit(2)},shares,reactions.summary(total_count).limit(0),comments.summary(total_count).limit(0)' } }, cap);
@@ -222,7 +261,7 @@ export async function facebookPosts(pageId: string, sinceIso: string, user: stri
   return out;
 }
 
-export async function instagramPosts(igId: string, pageId: string, sinceIso: string, user: string, f?: Fetch, cap = 300): Promise<PostStat[]> {
+export async function instagramPosts(igId: string, pageId: string, sinceIso: string, user: string | string[], f?: Fetch, cap = 300): Promise<PostStat[]> {
   const token = await pageToken(pageId, user, f);
   const rows = (await graphAll('/' + igId + '/media', { token, f, params: { limit: 50, fields: 'id,caption,media_type,media_product_type,timestamp,permalink,thumbnail_url,media_url,like_count,comments_count' } }, cap))
     .filter((m) => m.timestamp >= sinceIso);
@@ -236,14 +275,14 @@ export async function instagramPosts(igId: string, pageId: string, sinceIso: str
 }
 
 /** Current follower count of a connected account. */
-export async function followers(network: Network, extId: string, pageId: string, user: string, f?: Fetch): Promise<number | null> {
+export async function followers(network: Network, extId: string, pageId: string, user: string | string[], f?: Fetch): Promise<number | null> {
   const token = await pageToken(pageId, user, f);
   const j = await graph('/' + extId, { token, f, params: { fields: network === 'facebook' ? 'followers_count,fan_count' : 'followers_count' } }).catch(() => null);
   return j ? Number(j.followers_count ?? j.fan_count) || 0 : null;
 }
 
 /** Instagram audience (age/gender, city) — only for accounts with 100+ followers. */
-export async function igAudience(igId: string, pageId: string, user: string, f?: Fetch) {
+export async function igAudience(igId: string, pageId: string, user: string | string[], f?: Fetch) {
   const token = await pageToken(pageId, user, f);
   const one = async (breakdown: string) => {
     const j = await graph('/' + igId + '/insights', { token, f, params: { metric: 'follower_demographics', period: 'lifetime', metric_type: 'total_value', breakdown } }).catch(() => null);
@@ -254,7 +293,7 @@ export async function igAudience(igId: string, pageId: string, user: string, f?:
 }
 
 /** A competitor's public Instagram business/creator account: profile + latest posts. */
-export async function igCompetitor(myIgId: string, pageId: string, username: string, user: string, f?: Fetch) {
+export async function igCompetitor(myIgId: string, pageId: string, username: string, user: string | string[], f?: Fetch) {
   const token = await pageToken(pageId, user, f);
   const u = username.replace(/^@/, '').replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/\/.*$/, '');
   const j = await graph('/' + myIgId, { token, f, params: { fields: `business_discovery.username(${u}){username,name,followers_count,media_count,profile_picture_url,media.limit(30){caption,like_count,comments_count,timestamp,media_type,media_product_type,permalink,media_url,thumbnail_url}}` } });

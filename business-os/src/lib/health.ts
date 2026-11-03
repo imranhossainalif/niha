@@ -8,6 +8,7 @@ import { db } from './db';
 import { cfg, type ConfigKey } from './config';
 import { MODEL } from './anthropic';
 import { getConfig as inboxConfig } from './inbox/store';
+import { metaUserToken } from './social/meta';
 
 export type Status = 'ok' | 'warn' | 'bad' | 'off';
 export type Limit = { label: string; used: number; max: number; unit?: string; note?: string };
@@ -282,8 +283,12 @@ async function serverCheck(): Promise<Health> {
 const SOCIAL_SCOPES = ['pages_manage_posts', 'pages_read_engagement', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights'];
 async function socialCheck(): Promise<Health> {
   const base = { id: 'social', name: 'Social Media (Facebook, Instagram, YouTube, TikTok)', keys: ['META_SOCIAL_TOKEN'] as ConfigKey[], links: [{ label: 'System users', url: 'https://business.facebook.com/settings/system-users' }] };
+  // Check the token publishing actually prefers (lib/social/meta socialToken): the Settings system token,
+  // else the one-click Facebook Login token, else the ads token. Checking only the ads token made the
+  // dashboard warn about missing post permissions even when the login token had them all.
   const own = await cfg('META_SOCIAL_TOKEN');
-  const token = own || (await cfg('META_ADS_TOKEN'));
+  const oauth = own ? undefined : await metaUserToken().catch(() => undefined);
+  const token = own || oauth || (await cfg('META_ADS_TOKEN'));
   const accts = (await db().collection('social_accounts').limit(100).get()).map((x) => x.data as { name: string; network: string; active?: boolean; error?: string }).filter((a) => a.active !== false);
   const NET: Record<string, string> = { facebook: 'FB ', instagram: 'IG ', youtube: 'YouTube ', tiktok: 'TikTok ' };
   if (!token) return { ...base, status: accts.length ? 'ok' : 'off', summary: accts.length ? accts.length + ' ta account connect (Facebook/Instagram er token nai).' : 'Social token nai — post/schedule kora jabe na.', fix: 'Kids Care → Social Media → Accounts e step gulo dekhun.' };
@@ -294,7 +299,7 @@ async function socialCheck(): Promise<Health> {
   const failed = await db().collection('social_posts').where('status', 'in', ['failed', 'partial']).limit(200).get();
   const recentFail = failed.map((x) => x.data as { published_at?: string; scheduled_at?: string; error?: string }).filter((x) => String(x.scheduled_at || x.published_at || '') >= since);
   const sync = await lastJob('social_sync');
-  const details: [string, string][] = [['Token', own ? 'Social token' : 'Ads token (post korar permission thakbe na)'], ['Connect kora', accts.map((a) => (NET[a.network] || '') + a.name).join(', ') || 'kichu na'],
+  const details: [string, string][] = [['Token', own ? 'Social token' : oauth ? 'Facebook login (one-click) token' : 'Ads token (post korar permission thakbe na)'], ['Connect kora', accts.map((a) => (NET[a.network] || '') + a.name).join(', ') || 'kichu na'],
     ['Shesh data sync', sync ? ago(sync.createdAt) + ' · ' + sync.status : '—'], ...tokenLines(t).details];
   for (const f of recentFail.slice(0, 5)) details.push(['Hoyni', String(f.error || '').slice(0, 200)]);
   const notes: string[] = []; const st: Status[] = ['ok'];
@@ -303,7 +308,7 @@ async function socialCheck(): Promise<Health> {
   if (recentFail.length) { st.push('bad'); notes.push('Shesh 24 ghontay ' + recentFail.length + ' ta post publish hoyni.'); }
   if (sync?.status === 'failed') { st.push('warn'); notes.push('Shesh data sync e error.'); }
   for (const a of accts.filter((x) => x.error)) { st.push('bad'); notes.push((NET[a.network] || '') + a.name + ': ' + a.error); }
-  return { ...base, status: worst(st), summary: notes.join(' ') || 'Kaj korche: ' + accts.length + ' ta account connect.', details, fix: missing.length ? 'System user e notun token banan ei permission gulo tick kore (Social Media → Accounts e step ache), Settings e "Social media token" e boshan.' : notes.length ? notes.join(' ') : undefined };
+  return { ...base, status: worst(st), summary: notes.join(' ') || 'Kaj korche: ' + accts.length + ' ta account connect.', details, fix: missing.length ? 'Social Media → Accounts e "Facebook diye connect" diye abar login kore shob permission din, ba system user e notun token banan ei permission gulo tick kore Settings e "Social media token" e boshan.' : notes.length ? notes.join(' ') : undefined };
 }
 
 const CHECKS: [string, () => Promise<Health>][] = [

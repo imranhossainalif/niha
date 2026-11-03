@@ -12,7 +12,7 @@ import { channel, publishYouTube, youtubePosts, type YtOptions } from '../social
 import { profile, publishTikTok, tiktokPosts, type TtOptions } from '../social/tiktok';
 import { pinBoards, pinProfile, pinterestPosts, publishPinterest, type PinBoard } from '../social/pinterest';
 import { liProfile, publishLinkedIn } from '../social/linkedin';
-import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, publishFacebook, publishInstagram, socialToken, type Fetch, type Network, type PostStat } from '../social/meta';
+import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, metaTokens, publishFacebook, publishInstagram, type Fetch, type Network, type PostStat } from '../social/meta';
 import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
 import { recordUsage } from '../aiUsage';
@@ -39,7 +39,9 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
   // claim it (a second worker/click loses the version race)
   await ref.set({ ...post, status: 'publishing' }, { expectedVersion: snap.version });
   const all = await accounts(post.business);
-  const user = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await socialToken() : '';
+  // Candidate tokens, not one: each Facebook login covers different Pages, so a Page token is derived
+  // from whichever stored login can manage that Page (see metaTokens in lib/social/meta).
+  const user: string | string[] = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await metaTokens() : '';
   const accts = new Map(all.map((a) => [a.id, a]));
   const targets: Target[] = [];
   for (const t of post.targets) {
@@ -94,7 +96,7 @@ export async function publishDue(f?: Fetch) {
 export async function socialSync(opts: { days?: number; f?: Fetch } = {}) {
   const list = await accounts();
   if (!list.length) return { skipped: 'kono social account connect kora nai' };
-  const user = list.some((a) => a.network === 'facebook' || a.network === 'instagram') ? await socialToken() : '';
+  const user: string | string[] = list.some((a) => a.network === 'facebook' || a.network === 'instagram') ? await metaTokens() : '';
   const since = new Date(Date.now() - (opts.days ?? 90) * 864e5).toISOString();
   const ins = db().collection('social_insights');
   const today = bdToday();

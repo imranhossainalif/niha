@@ -4,7 +4,7 @@
 // on the fly, so no page token is ever stored.
 // Facts this follows: Meta removed posting to Groups from the API (2024); Instagram needs a public media URL and
 // can't post text only; Facebook Page post metrics need pages_read_engagement + read_insights.
-import { cfg, listSecretNames, readSecret } from '../config';
+import { cfg, readSecret } from '../config';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
 export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'pinterest' | 'linkedin';
@@ -87,20 +87,19 @@ export async function metaUserToken(): Promise<string | undefined> {
 }
 
 /**
- * Every one-click user token we hold, latest login first: 'meta:user' plus one per Facebook user from
- * earlier logins ('meta:user:<fb id>', saved by the OAuth callback since this fix). Each Facebook login is
- * limited to the Pages/assets chosen in that run's picker, so no single token can manage every Page —
- * a Page token must be derivable from ANY of them, otherwise connecting a second business silently
- * breaks the first business's publishing (the "Hoyni" outage of Nov 2026).
+ * Every one-click user token we hold, latest login first: 'meta:user' plus the recent-login history
+ * ('meta:users', maintained by the OAuth callback). Each Facebook login is limited to the Pages/assets
+ * chosen in that run's picker — the SAME person can reconnect tomorrow for one business with a narrow
+ * picker — so no single token can manage every Page. A Page token must be derivable from ANY stored
+ * login, otherwise connecting a second business silently breaks the first one's publishing (the
+ * "Hoyni" outage of Nov 2026).
  */
 export async function metaUserTokens(): Promise<string[]> {
   const out: string[] = [];
   const push = (t?: string) => { if (t && !out.includes(t)) out.push(t); };
   push(await metaUserToken());
-  for (const name of await listSecretNames('meta:user:').catch(() => [] as string[])) {
-    const t = await readSecret<MetaTokens>(name).catch(() => null);
-    push(t && t.access_token && t.expires_at > Date.now() + 60e3 ? t.access_token : undefined);
-  }
+  const hist = await readSecret<MetaTokens[]>('meta:users').catch(() => null);
+  for (const t of hist ?? []) push(t.access_token && t.expires_at > Date.now() + 60e3 ? t.access_token : undefined);
   return out;
 }
 

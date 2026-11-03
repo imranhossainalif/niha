@@ -121,9 +121,3 @@ export async function readSecret<T = any>(name: string): Promise<T | null> {
   try { return v ? (JSON.parse(v) as T) : null; } catch { return null; }
 }
 export async function deleteSecret(name: string) { await prisma.setting.deleteMany({ where: { key: 'secret:' + name } }); clearConfigCache(); }
-
-/** Names of stored secrets under a prefix (e.g. 'meta:user:' → ['meta:user:123…']) — names only, never values. */
-export async function listSecretNames(prefix: string): Promise<string[]> {
-  const rows = await prisma.setting.findMany({ where: { key: { startsWith: 'secret:' + prefix } }, select: { key: true } }).catch(() => [] as { key: string }[]);
-  return rows.map((r: { key: string }) => r.key.slice('secret:'.length));
-}

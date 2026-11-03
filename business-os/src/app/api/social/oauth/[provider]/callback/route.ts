@@ -1,6 +1,6 @@
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
-import { saveSecret } from '@/lib/config';
+import { readSecret, saveSecret } from '@/lib/config';
 import { requestPrincipal } from '@/lib/session';
 import { isFull } from '@/lib/access';
 import { exchangeCode, type Provider } from '@/lib/social/oauth';
@@ -38,10 +38,14 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
       // derive page tokens from it) and connect every Page / Instagram this login can manage to this business.
       const me = await metaMe(t.access_token);
       await saveSecret('meta:user', { access_token: t.access_token, expires_at: t.expires_at, user_id: me.id, name: me.name });
-      // Also keep this login under its own Facebook user id: the shared 'meta:user' is overwritten by the
-      // NEXT connect (maybe for another business, with a narrower Page picker), and publishing derives a
-      // Page token from any stored login that can manage the Page (metaTokens in lib/social/meta).
-      await saveSecret('meta:user:' + me.id, { access_token: t.access_token, expires_at: t.expires_at, user_id: me.id, name: me.name });
+      // Keep a short history of recent logins too: 'meta:user' is overwritten by the NEXT connect, and a
+      // later connect (maybe for another business, with a narrower Page picker — possibly by the same
+      // Facebook user) must not erase the only token that could manage some other business's Page.
+      // Publishing derives a Page token from any stored login that can manage it (metaTokens in meta.ts).
+      const prevLogins = (await readSecret<{ access_token: string; expires_at: number }[]>('meta:users').catch(() => null)) ?? [];
+      const logins = [{ access_token: t.access_token, expires_at: t.expires_at, user_id: me.id },
+        ...prevLogins.filter((x) => x.access_token !== t.access_token && x.expires_at > Date.now() + 60e3)].slice(0, 6);
+      await saveSecret('meta:users', logins);
       const found = await discoverAccounts(t.access_token);
       const biz = st.business || 'kidscare';
       for (const a of found) {

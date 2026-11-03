@@ -109,6 +109,36 @@ describe('publishing (mocked Meta)', () => {
     const g = fakeGraph();
     await expect(publishInstagram('IG1', 'PAGE4', { text: 'only text', media: [] }, 'USER', g.f)).rejects.toThrow(/chobi ba video/);
   });
+  it('Facebook: falls back to the next stored login when one cannot manage the page', async () => {
+    // Each Facebook login is limited to the Pages picked in its run — the page token must come from
+    // whichever stored login can manage THIS page, not only from the latest login.
+    const seen: string[] = [];
+    const f = (async (input: string | URL, init?: RequestInit) => {
+      const u = new URL(String(input));
+      const params = Object.fromEntries(init?.method === 'POST' ? new URLSearchParams(String(init.body)) : u.searchParams);
+      const path = u.pathname.replace(/^\/v21\.0/, '');
+      const ok = (j: unknown) => new Response(JSON.stringify(j), { status: 200 });
+      if (params.fields === 'access_token') {
+        seen.push(params.access_token);
+        if (params.access_token === 'BAD') return new Response(JSON.stringify({ error: { message: '(#100) Object does not exist', code: 100 } }), { status: 400 });
+        return ok({ access_token: 'PAGE_TOKEN' });
+      }
+      if (path.endsWith('/photos')) return ok({ id: 'ph1', post_id: 'page_post9' });
+      if (params.fields === 'permalink_url') return ok({ permalink_url: 'https://fb/p' });
+      return ok({});
+    }) as Fetch;
+    const r = await publishFacebook('PAGE9', { text: 'Hi', media: [{ url: 'https://x/a.jpg', mime: 'image/jpeg' }] }, ['BAD', 'GOOD'], f);
+    expect(r.ext_post_id).toBe('page_post9');
+    expect(seen).toEqual(['BAD', 'GOOD']);
+  });
+  it('Facebook: when no stored login can manage the page, Meta’s own error surfaces', async () => {
+    const f = (async (input: string | URL) => {
+      const u = new URL(String(input));
+      if (u.searchParams.get('fields') === 'access_token') return new Response(JSON.stringify({ error: { message: '(#100) Object does not exist', code: 100 } }), { status: 400 });
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as Fetch;
+    await expect(publishFacebook('PAGE10', { text: 'Hi', media: [{ url: 'https://x/a.jpg', mime: 'image/jpeg' }] }, ['BAD1', 'BAD2'], f)).rejects.toThrow(/#100/);
+  });
 });
 
 describe('YouTube + TikTok (mocked)', async () => {

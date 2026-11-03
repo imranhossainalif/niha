@@ -98,6 +98,9 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
   const quick: [string, Date][] = [];
   { const d = new Date(); d.setHours(20, 0, 0, 0); if (d.getTime() > Date.now() + 10 * 60e3) quick.push(['Aaj raat 8ta', d]); const k = new Date(); k.setDate(k.getDate() + 1); k.setHours(10, 0, 0, 0); quick.push(['Kal sokal 10ta', k]); }
   for (const b of (best ?? []).slice(0, 2)) quick.push(['★ ' + WEEKDAYS[b.weekday] + ' ' + String(b.hour).padStart(2, '0') + ':00', nextSlot(b.weekday, b.hour + 1)]);
+  // Why the last publish failed (stored by the publisher on the post / its targets) — shown when editing
+  // a failed or partial post, instead of the bare "Hoyni" the calendar used to be the only signal.
+  const prevErr = initial?.error || (initial?.targets ?? []).filter((t) => t.status === 'failed' && t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ');
   const preview = accounts.find((a) => a.id === (pv || (tab !== 'all' ? tab : '')) && sel.includes(a.id)) ?? chosen[0];
   const counts = chosen.map((a) => ({ a, n: textFor(a.id).length, max: LIMIT[a.network] }));
 
@@ -208,6 +211,7 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
             </div>
           </details>
 
+          {editing && prevErr && <div className="sm-warn err sm-fade"><Icon name="alert" />Shesh bar hoyni: {prevErr}</div>}
           {err ? <div className="sm-warn err sm-fade"><Icon name="alert" />{err}</div> : problems.length > 0 && chosen.length > 0 && <div className="sm-warn"><Icon name="alert" />{problems[0]}{problems.length > 1 ? ' (+' + (problems.length - 1) + ')' : ''}</div>}
         </div>
 

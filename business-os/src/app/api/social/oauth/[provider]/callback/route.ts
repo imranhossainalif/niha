@@ -38,10 +38,19 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
       // derive page tokens from it) and connect every Page / Instagram this login can manage to this business.
       const me = await metaMe(t.access_token);
       await saveSecret('meta:user', { access_token: t.access_token, expires_at: t.expires_at, user_id: me.id, name: me.name });
+      // Also keep this login under its own Facebook user id: the shared 'meta:user' is overwritten by the
+      // NEXT connect (maybe for another business, with a narrower Page picker), and publishing derives a
+      // Page token from any stored login that can manage the Page (metaTokens in lib/social/meta).
+      await saveSecret('meta:user:' + me.id, { access_token: t.access_token, expires_at: t.expires_at, user_id: me.id, name: me.name });
       const found = await discoverAccounts(t.access_token);
       const biz = st.business || 'kidscare';
       for (const a of found) {
-        await db(p).collection('social_accounts').doc(a.network + '_' + a.ext_id).set({ business: biz, network: a.network, ext_id: a.ext_id, page_id: a.network === 'facebook' ? a.ext_id : a.page_id || '', name: a.name, username: a.username, picture: a.picture, followers: a.followers, active: true, connected_at: new Date().toISOString(), error: '' });
+        const ref = db(p).collection('social_accounts').doc(a.network + '_' + a.ext_id);
+        // An account already connected to ANOTHER business stays with that business — a connect here
+        // must not silently steal it (the doc holds one business; Accounts → discover is the explicit
+        // way to move an account). Only brand-new accounts join this business.
+        const curBiz = ((await ref.get())?.data as { business?: string } | undefined)?.business;
+        await ref.set({ business: curBiz || biz, network: a.network, ext_id: a.ext_id, page_id: a.network === 'facebook' ? a.ext_id : a.page_id || '', name: a.name, username: a.username, picture: a.picture, followers: a.followers, active: true, connected_at: new Date().toISOString(), error: '' });
       }
       if (!found.length) return page(false, 'Kono Facebook Page pawa jayni — je Facebook account diye login korechen sheta diye ekta Page manage thakte hobe. Page thakle abar connect kore Page ta select korun.', biz);
       return page(true, found.length + ' ta account connect hoyeche: ' + found.map((a) => a.name).join(', ') + '. Ei window bondho korun.', biz);

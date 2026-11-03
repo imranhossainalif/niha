@@ -62,6 +62,7 @@ export function Calendar({ business, refresh, nets, onOpen, onNew }: { business:
         <span className="row" style={{ gap: 4, paddingLeft: 4 }}>{ns.map((n) => <NetLogo key={n} net={n} size={14} />)}<b>{when(p) ? timeLocal(when(p)) : 'Draft'}</b><span className="grow" />{!mini && <span className="xs" style={{ color: c, fontWeight: 700 }}>{l}</span>}</span>
         {!mini && m && (m.mime.startsWith('video/') ? <video className="thumb" src={m.url} muted preload="metadata" /> : <img className="thumb" src={m.url} alt="" loading="lazy" />)}
         <span className={mini ? 'clamp2 xs' : 'clamp2'} style={{ paddingLeft: 4 }}>{p.text || <i className="muted">(lekha nai)</i>}</span>
+        {!mini && (p.status === 'failed' || p.status === 'partial') && p.error && <span className="clamp2 xs" style={{ paddingLeft: 4, color: 'var(--bad)' }} title={p.error}>{p.error}</span>}
       </button>
     );
   };

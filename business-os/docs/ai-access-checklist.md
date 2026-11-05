@@ -1,7 +1,7 @@
 # AI access checklist — how to give an AI access without leaking secrets
 
-Companion to [`AI_HANDOFF.md`](AI_HANDOFF.md). This is the "who clicks what" list for Imran. Boxes are meant to be
-ticked per AI/session.
+Companion to [`AI_HANDOFF.md`](AI_HANDOFF.md) — repo-root path: `business-os/docs/ai-access-checklist.md`. This is the
+"who clicks what" list for Imran. Boxes are meant to be ticked per AI/session.
 
 **Golden rule:** the AI never receives a secret in a chat message, a commit, a screenshot or a document. Secrets are put
 in a **local env file** or in **Admin → Integrations**, and the AI only learns the **path/location**.
@@ -102,6 +102,30 @@ If that fails with 403, the key is read-only (as intended for `ai-read`).
 
 ---
 
+## Level 2b — an AI that needs its own SSH key (push / PR)
+
+Some AIs (or a second machine) need their own key. Two options:
+
+**A. Account SSH key (the AI pushes branches and can operate the repo).**
+- [ ] The AI gives Imran its **public** key (`ssh-ed25519 ... comment`), never the private key.
+- [ ] Imran: GitHub → **Settings → SSH and GPG keys → New SSH key** → paste → Add.
+- [ ] The AI verifies: `ssh -T git@github.com` → `Hi imranhossainalif! You've successfully authenticated`.
+
+**B. Repo deploy key with write access (narrower: this repo only).**
+- [ ] GitHub → repo → **Settings → Deploy keys → Add deploy key** → paste the AI's public key → tick
+  **Allow write access**.
+- [ ] The AI can `git push` branches to this repo (remote `git@github.com:imranhossainalif/niha.git`).
+
+**Important:** an SSH key alone lets the AI **push branches**, but **creating or merging a pull request via the GitHub
+API needs a token** (browser login or a fine-grained PAT). So either:
+- Imran creates/merges the PR in the browser (recommended), or
+- Imran gives a **fine-grained PAT** (repo `niha`, Contents read/write + Pull requests read/write) through the local env
+  file — **never chat, never a commit** — and revokes it after.
+
+Do not give the AI the account password or a token with access to all repos if a repo-scoped deploy key is enough.
+
+---
+
 ## Level 3 — test database (needed for DB/integration tests)
 
 - [ ] Option A (local Mac): Docker Postgres on a spare port, e.g.
@@ -137,6 +161,19 @@ If it is truly needed:
 
 If a secret is accidentally pasted into a chat or committed: **rotate it**, revoke the API key / token, and check
 `git log -p` for the value before assuming it is gone.
+
+---
+
+## API key UI — what to check the first time (owner)
+
+These are the behaviours the code implements (`src/app/admin/page.tsx`, `src/lib/apikeys.ts`):
+
+- [ ] `ai-read` can be created with the `write` checkbox **off** → scope `read`.
+- [ ] The full key is shown **once** on `/admin` (60-second httpOnly cookie), then only the prefix remains.
+- [ ] `/api/v1/me` with the key returns `scopes:["read"]`.
+- [ ] After one authenticated call, the key's **Shesh use** (`lastUsedAt`) column updates in Admin.
+- [ ] **Revoke** immediately stops the key (`/api/v1/me` returns 401 afterwards) and the row leaves the list.
+If a step fails, paste the error (without the key) so the code can be checked.
 
 ---
 

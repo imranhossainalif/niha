@@ -4,7 +4,11 @@
 one. It contains **no secrets** — access (API key, SSH) is handed over separately, see
 [`ai-access-checklist.md`](ai-access-checklist.md).
 
-Last updated: 2026-11-01 (after the `localservicehq` business was added and the Sales Team per-rep fix went live).
+**Path from the repo root:** `business-os/docs/AI_HANDOFF.md`. There is no `docs/AI_HANDOFF.md` at the repo root (raw
+links built as `/docs/AI_HANDOFF.md` 404); a root-level `AI_HANDOFF.md` pointer file exists for convenience.
+
+Last updated: 2026-11-05 (repo has moved on: `personalbrand` business, LinkedIn/Pinterest social, Meta per-login token
+history — see §11).
 
 ---
 
@@ -13,12 +17,15 @@ Last updated: 2026-11-01 (after the `localservicehq` business was added and the 
 **EasyFounder** is Imran Hossain Alif's self-hosted business OS / CRM dashboard (live: <https://os.osmanhadi.live>).
 Everything runs on his own VPS: Next.js 15 web app + a background worker + PostgreSQL + Caddy (Docker Compose).
 
-Businesses (`business-os/src/lib/business.ts` → `BIZ`): `kidscare` (Kids Care BD, baby food), `insafia`, `lrf`
-(Local Revenue Flow), `localservicehq` (new agency business, LRF-style structure), `itevs`, `hajj`, `others`,
-`personal`.
+Businesses (`business-os/src/lib/business.ts` → `BIZ`, 9 entries): `kidscare` (Kids Care BD, baby food), `insafia`,
+`lrf` (Local Revenue Flow), `localservicehq` (agency business, LRF-style structure), `personalbrand` (display name
+"Imran Hossain Alif" — personal social/profile home), `itevs`, `hajj`, `others`, `personal`.
 
-- Repo: `github.com/imranhossainalif/niha`, app code in `business-os/`.
+- Repo: `github.com/imranhossainalif/niha`, app code in `business-os/`. The repo may be public or private; when private,
+  code access needs an SSH key or token (see the checklist).
 - Deploy branch: **`claude/nice-wright-ngqxec`**. A push there goes live within ~5 minutes (`deploy/update.sh` timer).
+  Other AI sessions have merged many PRs from `mica/*` branches; always rebase your branch on the latest
+  `origin/claude/nice-wright-ngqxec` before opening a PR.
 - Languages: the **UI is Banglish** (Bangla words in English letters). You (the AI) reply to Imran in **Banglish**.
   Customer-facing Messenger replies are in **Bangla script**, everyone is "আপু".
 
@@ -28,7 +35,8 @@ Businesses (`business-os/src/lib/business.ts` → `BIZ`): `kidscare` (Kids Care 
 2. `business-os/docs/ORIGINAL_BRIEF.md` — the original brief, product rules, build order.
 3. `business-os/docs/DATA_MODEL.md` — collections and fields.
 4. `business-os/docs/DEEPSEEK_GUIDE.md` — Banglish guide written for AI coding tools (deploy rules, what is built).
-5. This file — access, live-operation, known issues.
+5. `business-os/docs/LOCALSERVICEHQ.md` — only if you touch the LocalServiceHQ (agency) business.
+6. This file — access, live-operation, known issues.
 
 ---
 
@@ -61,7 +69,7 @@ Businesses (`business-os/src/lib/business.ts` → `BIZ`): `kidscare` (Kids Care 
 | Extra legacy tab code | `src/lib/legacy/*.ts` (`salesLive.ts` = Sales Team, `attendance.ts`, `webTraffic.ts`, …) |
 | Native pages | `/` (home counts), `/admin`, `/settings`, `/social/[business]`, `/legal/*` |
 | InboxPilot (Messenger AI) | `src/lib/inbox/*`, webhook `src/app/api/meta/webhook/route.ts` |
-| Social media (Publer-like) | `src/lib/social/*`, `src/components/social/*`, `src/app/social/[business]/page.tsx` |
+| Social media (Publer-like: Facebook, Instagram, YouTube, TikTok, LinkedIn, Pinterest) | `src/lib/social/*`, `src/components/social/*`, `src/app/social/[business]/page.tsx` |
 | AI assistant (server-side) | `src/lib/ai/agent.ts` (`askAssistant`, `runAgent`) |
 | Calculations (tested) | `src/lib/calc/nuport.ts`, `pl.ts`, `engine.ts` |
 | Worker / scheduled jobs | `worker/index.ts`, `src/lib/jobs/runner.ts`, `src/lib/jobs/*` |
@@ -157,6 +165,16 @@ Tools: `list_collections`, `get_doc`, `query_docs`, `put_doc`, `patch_doc`, `del
 Dashboard routes: `/` home counts · `/app` full legacy dashboard · `/admin` users/API keys/jobs/integrations status ·
 `/settings` API & connection health · `/social/kidscare` social media · `/legal/privacy`, `/legal/terms`.
 
+### Creating a key (owner only, via the UI)
+
+Admin (`/admin`) → section **API keys (Claude / automation)**:
+
+1. Type a name, e.g. `ai-read`, leave the **`write`** checkbox **off**, click **Notun key** (new key). The full `bos_...`
+   key appears once (a 60-second httpOnly cookie; it is never in the URL or in logs) — copy it immediately.
+2. For write access later: create `ai-write` with the `write` checkbox on; revoke it when done.
+3. The table shows name, prefix, scopes, **Shesh use** (`lastUsedAt`) and a **Revoke** button; revoked keys stop working
+   immediately and disappear from the list.
+
 **Key limitations:** API keys are owner/admin-level and are **not** business- or collection-scoped (a write key can
 overwrite/delete live docs). Keys are revocable and show `lastUsedAt` in Admin. Prefer read-only; create a write key
 only for the current task and revoke it afterwards.
@@ -181,7 +199,7 @@ only for the current task and revoke it afterwards.
 
 | Secret | Where it should be set | How code reads it |
 |---|---|---|
-| Anthropic, Meta, Nuport, Google Sheets, Supermetrics, Make, YouTube/TikTok OAuth | `.env` or **Admin → Integrations** (encrypted AES-256-GCM) | `await cfg('KEY')` only |
+| Anthropic, Meta (+ second Ads token), Nuport, Google Sheets, Supermetrics, Make, YouTube/TikTok/Pinterest/LinkedIn OAuth | `.env` or **Admin → Integrations** (encrypted AES-256-GCM) | `await cfg('KEY')` only |
 | `AUTH_SECRET`, DB password, `POSTGRES_PASSWORD` | `.env` on the server (and local `.env` for dev) | env only |
 | User password hashes / sessions | PostgreSQL (`users`, JWT cookie) | never read |
 | OAuth tokens (YouTube/TikTok) | encrypted `app_settings` (`saveSecret`) | `readSecret()` |
@@ -217,9 +235,10 @@ file or Admin → Integrations and tells you the **path/where**, not the value. 
 
 ---
 
-## 11. Known issues / roadmap (as of 2026-11-01)
+## 11. Known issues / roadmap (reviewed 2026-10-30; social items re-check after the 2026-11-01..05 `mica/*` PRs)
 
-**Open, high value:**
+**Open, high value** (some social items may be fixed by the recent LinkedIn/Pinterest/Meta-token PRs — verify in the
+current code before fixing them again):
 - **Deploy/migration safety:** no pre-migration `pg_dump` in `deploy/update.sh` (P1).
 - **Backups:** `deploy/setup-vps.sh` creates `backups/` as `chmod 777`, dump files use default permissions and the DB
   password is in `pg_dump` argv; dumps contain PII (P1).

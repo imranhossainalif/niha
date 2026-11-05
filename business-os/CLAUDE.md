@@ -3,8 +3,9 @@
 Self-hosted business OS for Imran Hossain Alif (Bangladesh), branded **EasyFounder** (logo files in `public/brand/`: `logo.png` green, `logo-white.png` for dark backgrounds, `mark*.png`, favicons). The original brief is `docs/ORIGINAL_BRIEF.md`
 (build order, product rules, integrations) — read it before large changes. Keep this file current when the architecture changes.
 
-**New AI session?** Read `docs/AI_HANDOFF.md` first (live access, deploy rules, known issues, sanitized fixtures) and
-`docs/ai-access-checklist.md` (how Imran hands over access without pasting secrets into chat).
+**New AI session?** Read `docs/AI_HANDOFF.md` first (from the repo root: `business-os/docs/AI_HANDOFF.md`) — live access,
+deploy rules, known issues, sanitized fixtures — and `docs/ai-access-checklist.md` (how Imran hands over access without
+pasting secrets into chat).
 
 ## Non-negotiable product rules
 - Analysis text labels **FACT** (from data) vs **HYPOTHESIS** (inference). No guarantees on CPM, CTR or sales.

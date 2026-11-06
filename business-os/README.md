@@ -4,8 +4,8 @@ Self-hosted CRM / business operating system for Imran's businesses (Kids Care BD
 Next.js + PostgreSQL + a background worker. Everything from the old claude.ai dashboard works here, plus the native
 Messenger inbox (InboxPilot), the Nuport and Google Sheets syncs, an API for Claude, and nightly backups.
 
-> **Private data.** `data/` (the export) and `.env` are git-ignored. This repo is public, so keep it that way,
-> or make the repo private before committing any data.
+> **Private data.** `data/` (the export) and `.env` are git-ignored. The repo's visibility can change; either way
+> `data/` and `.env` must never be committed, and secrets in history stay there even after the repo is made private.
 
 ## What's where
 

@@ -1,0 +1,21 @@
+{
+  "date": "2026-10-30",
+  "business": "kidscare",
+  "asof": "2026-10-30T20:50:00Z",
+  "source": "nuport",
+  "orders": 34,
+  "real_orders": 32,
+  "cancelled": 2,
+  "delivered": 18,
+  "delivered_amount": 68900,
+  "in_progress": 12,
+  "sent": 31,
+  "sent_amount": 118200,
+  "sent_delivered": 17,
+  "sent_delivered_amount": 65200,
+  "sent_in_transit": 11,
+  "sent_in_transit_amount": 42100,
+  "sent_returned": 3,
+  "sent_other": 0,
+  "cash_due": 8600
+}

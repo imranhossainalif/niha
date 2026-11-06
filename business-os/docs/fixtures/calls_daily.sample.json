@@ -1,0 +1,27 @@
+[
+  {
+    "date": "2026-10-30",
+    "reps": { "Lamia": 12, "Nusrat": 8, "Shayla": 0, "Jhumur": 31, "Maruf": 5 },
+    "rcv": { "Lamia": 4, "Nusrat": 3, "Shayla": 0, "Jhumur": 14, "Maruf": 1 },
+    "ord": { "Lamia": 0, "Nusrat": 1, "Shayla": 0, "Jhumur": 2, "Maruf": 0 },
+    "otk": { "Lamia": 0, "Nusrat": 1250, "Shayla": 0, "Jhumur": 2400, "Maruf": 0 },
+    "calls": 56,
+    "received": 22,
+    "orders": 3,
+    "order_tk": 3650,
+    "src": { "v6": { "calls": 0, "received": 0, "orders": 0 } },
+    "asof": "2026-10-30T15:20:00Z"
+  },
+  {
+    "date": "2026-10-28",
+    "reps": { "Lamia": 10, "Nusrat": 7, "Shayla": 0, "Jhumur": 28, "Maruf": 4 },
+    "rcv": {},
+    "ord": {},
+    "otk": {},
+    "calls": 49,
+    "received": 19,
+    "orders": 2,
+    "order_tk": 2100,
+    "asof": "2026-10-28T15:20:00Z"
+  }
+]

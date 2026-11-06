@@ -38,33 +38,45 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
   if (post.status === 'publishing') throw Object.assign(new Error('Post ta ekhon publish hocche'), { status: 409, code: 'conflict' });
   // claim it (a second worker/click loses the version race)
   await ref.set({ ...post, status: 'publishing' }, { expectedVersion: snap.version });
-  const all = await accounts(post.business);
-  // Candidate tokens, not one: each Facebook login covers different Pages, so a Page token is derived
-  // from whichever stored login can manage that Page (see metaTokens in lib/social/meta).
-  const user: string | string[] = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await metaTokens() : '';
-  const accts = new Map(all.map((a) => [a.id, a]));
-  const targets: Target[] = [];
-  for (const t of post.targets) {
-    if (t.status === 'published') { targets.push(t); continue; }
-    const a = accts.get(t.account_id);
-    try {
-      if (!a) throw new Error('Account ta ar connect nai');
-      const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
-      const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
-        : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
-        : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
-        : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f)
-        : await publishVideo(a.network, a.id, post, input.text, f);
-      targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
-    } catch (e) {
-      targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString() });
+  try {
+    const all = await accounts(post.business);
+    // Candidate tokens, not one: each Facebook login covers different Pages, so a Page token is derived
+    // from whichever stored login can manage that Page (see metaTokens in lib/social/meta).
+    const user: string | string[] = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await metaTokens() : '';
+    const accts = new Map(all.map((a) => [a.id, a]));
+    const targets: Target[] = [];
+    for (const t of post.targets) {
+      if (t.status === 'published') { targets.push(t); continue; }
+      const a = accts.get(t.account_id);
+      try {
+        if (!a) throw new Error('Account ta ar connect nai');
+        const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
+        const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
+          : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
+          : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
+          : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f)
+          : await publishVideo(a.network, a.id, post, input.text, f);
+        targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
+      } catch (e) {
+        targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString() });
+      }
+      // Save progress after each target, so a crash before the final write
+      // does not re-post a target that already published on retry.
+      try { await ref.set({ ...post, targets: [...targets], status: 'publishing' } as unknown as Data); } catch { /* progress save is best-effort */ }
     }
+    const okN = targets.filter((t) => t.status === 'published').length;
+    const status: SocialPost['status'] = okN === targets.length ? 'published' : okN ? 'partial' : 'failed';
+    const cur = (await ref.get())!;
+    await ref.set({ ...(cur.data as SocialPost), targets, status, published_at: okN ? new Date().toISOString() : (cur.data as SocialPost).published_at, error: status === 'published' ? undefined : targets.filter((t) => t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ') } as unknown as Data);
+    return { status, targets };
+  } catch (e) {
+    // Never leave the post stuck in 'publishing': release the claim so it can be retried.
+    try {
+      const cur = await ref.get();
+      if (cur && (cur.data as SocialPost).status === 'publishing') await ref.set({ ...(cur.data as SocialPost), status: 'failed', error: String((e as Error).message || e).slice(0, 400) } as unknown as Data);
+    } catch { /* keep the original error */ }
+    throw e;
   }
-  const okN = targets.filter((t) => t.status === 'published').length;
-  const status: SocialPost['status'] = okN === targets.length ? 'published' : okN ? 'partial' : 'failed';
-  const cur = (await ref.get())!;
-  await ref.set({ ...(cur.data as SocialPost), targets, status, published_at: okN ? new Date().toISOString() : (cur.data as SocialPost).published_at, error: status === 'published' ? undefined : targets.filter((t) => t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ') } as unknown as Data);
-  return { status, targets };
 }
 
 /** YouTube / TikTok take one video file from our media store. */

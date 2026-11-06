@@ -33,6 +33,17 @@ describe('Growth Engine L × C × M × F', () => {
     expect(n.aov).toBeCloseTo(13000 / 14);
     expect(n.cl).toEqual({ calls: 100, rcv: 60, ord: 6 });
   });
+  it('call stats are Kids Care only: other businesses get zero calls', () => {
+    const S: State = {
+      sales_daily: [
+        { business: 'lrf', date: '2026-10-20', orders: 5, delivered: 4, delivered_amount: 5000 },
+      ],
+      calls_daily: [{ date: '2026-10-19', calls: 100, received: 60, orders: 6 }],
+    };
+    const n = engNums(S, 'lrf', '2026-10-20');
+    expect(n.c).toMatchObject({ orders: 5, deliv: 4, rev: 5000, days: 1 });
+    expect(n.cl).toEqual({ calls: 0, rcv: 0, ord: 0 });
+  });
   it('unit economics: break-even ROAS = 1 / gross margin, POAS after other costs', () => {
     const S: State = { settings: [{ id: 'kidscare', usd_rate: 100 }], pl_kidscare: [{ id: '2026-09', sales: 100000, cost: 60000, ads_usd_manual: 100 }], fixed_costs: [{ amount: 10000 }] };
     const u = engUnit(S, 'kidscare', '2026-10-05')!;

@@ -10,17 +10,18 @@ export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 const LOOK: Record<Status, { dot: string; label: string; bg: string }> = {
-  bad: { dot: '#d64545', label: 'Kaj korche na', bg: 'color-mix(in srgb, #d64545 10%, transparent)' },
-  warn: { dot: '#d99a1e', label: 'Dekhun', bg: 'color-mix(in srgb, #d99a1e 10%, transparent)' },
-  ok: { dot: '#1f9d6b', label: 'Thik ache', bg: 'transparent' },
-  off: { dot: '#8a9993', label: 'Connect kora nai', bg: 'transparent' },
+  // Status colors come from the design tokens (globals.css) — never hardcoded hex here.
+  bad: { dot: 'var(--bad)', label: 'Kaj korche na', bg: 'color-mix(in srgb, var(--bad) 10%, transparent)' },
+  warn: { dot: 'var(--warn)', label: 'Dekhun', bg: 'color-mix(in srgb, var(--warn) 10%, transparent)' },
+  ok: { dot: 'var(--good)', label: 'Thik ache', bg: 'transparent' },
+  off: { dot: 'var(--muted)', label: 'Connect kora nai', bg: 'transparent' },
 };
 const ORDER: Status[] = ['bad', 'warn', 'ok', 'off'];
 const nf = (n: number) => n.toLocaleString('en-IN', { maximumFractionDigits: 1 });
 
 function LimitBar({ l }: { l: NonNullable<Health['limits']>[number] }) {
   const pct = l.max ? Math.min(100, (l.used / l.max) * 100) : 0;
-  const color = pct >= 90 ? '#d64545' : pct >= 75 ? '#d99a1e' : '#1f9d6b';
+  const color = pct >= 90 ? 'var(--bad)' : pct >= 75 ? 'var(--warn)' : 'var(--good)';
   return (
     <div className="grid gap-1 text-sm">
       <div className="flex flex-wrap justify-between gap-2"><span>{l.label}</span><b>{nf(l.used)} / {nf(l.max)}{l.unit ? ' ' + l.unit : ''} · {Math.round(pct)}% use · baki {nf(Math.max(0, l.max - l.used))}{l.unit ? ' ' + l.unit : ''}</b></div>

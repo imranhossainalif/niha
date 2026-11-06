@@ -2,22 +2,99 @@
 @tailwind components;
 @tailwind utilities;
 
-:root { --bg: #f2f5f4; --panel: #fff; --fg: #14211e; --muted: #5c6e69; --line: #d7e0dd; --accent: #13896f; }
-@media (prefers-color-scheme: dark) {
-  :root { --bg: #0d1412; --panel: #151f1c; --fg: #e3ece9; --muted: #93a6a0; --line: #28372f; --accent: #34c08e; color-scheme: dark; }
+/*
+ * EasyFounder design tokens — the single source of truth for the native pages.
+ * The same values live in public/legacy/redesign.css (legacy dashboard) and
+ * src/components/social/social.css (.sm scope). If you change a token here,
+ * change it there too — tests/design-tokens.test.ts checks they agree.
+ * Rules behind these tokens: business-os/docs/DESIGN_SYSTEM.md
+ * (articles + perception-first-design research, 2026-11-06).
+ */
+:root {
+  /* surfaces + text */
+  --bg: #f2f5f4; --panel: #ffffff; --soft: #eaf0ee; --fg: #14211e; --muted: #5c6e69; --line: #d7e0dd;
+  /* brand */
+  --side: #0f3d35; --side-fg: #e3f0ec; --side-mute: #8db3a9; --side-act: #1b5a4e;
+  --accent: #13896f; --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* status — color is never decoration, only meaning */
+  --good: #0e8a62; --warn: #b8650e; --bad: #c2363f; --info: #2f6fd1;
+  /* business colors — canonical list, mirrors src/lib/business.ts BIZ */
+  --biz-kidscare: #c9661c; --biz-insafia: #a34b3b; --biz-lrf: #13896f; --biz-localservicehq: #16a34a;
+  --biz-personalbrand: #0891b2; --biz-itevs: #1f6fb8; --biz-hajj: #7c3aed; --biz-others: #5f7a74; --biz-personal: #6a4fc4;
+  /* type — max 2 families (+ mono for numbers/code) */
+  --display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+  --body: "Figtree", ui-sans-serif, system-ui, sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  /* shape + depth — one radius scale, one shadow scale */
+  --r-sm: 8px; --r: 12px; --r-lg: 14px; --r-xl: 18px;
+  --sh1: 0 1px 2px rgba(16, 33, 30, .06), 0 1px 1px rgba(16, 33, 30, .04);
+  --sh2: 0 10px 30px -8px rgba(16, 33, 30, .18), 0 2px 6px rgba(16, 33, 30, .06);
+  --ease: cubic-bezier(.2, .8, .2, 1);
 }
-body { background: var(--bg); color: var(--fg); font-family: ui-sans-serif, system-ui, sans-serif; }
-.card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0d1412; --panel: #151f1c; --soft: #1c2925; --fg: #e3ece9; --muted: #93a6a0; --line: #28372f;
+    --side: #0a2621; --side-fg: #e3f0ec; --side-mute: #7fa197; --side-act: #174a40;
+    --accent: #34c08e; --good: #34c08e; --warn: #e8973a; --bad: #ee6b73; --info: #6ba4f5;
+    --sh1: 0 1px 2px rgba(0, 0, 0, .4); --sh2: 0 12px 32px -8px rgba(0, 0, 0, .6);
+    color-scheme: dark;
+  }
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 14px; line-height: 1.5; }
+h1, h2, h3 { font-family: var(--display); letter-spacing: -.01em; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* surfaces */
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 16px; box-shadow: var(--sh1); }
 .muted { color: var(--muted); }
-.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 14px; background: var(--panel); color: var(--fg); cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .05s ease; }
+
+/* buttons — one primary action per screen, green; danger is text-only red */
+.btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; font-size: 14px; background: var(--panel); color: var(--fg); cursor: pointer; transition: border-color .15s ease, background .15s ease, transform .05s ease; min-height: 36px; }
 .btn:hover { border-color: var(--muted); }
 .btn:active { transform: translateY(1px); }
 .btn-primary { background: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primary:hover { border-color: var(--accent); filter: brightness(1.07); }
-.input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--panel); color: var(--fg); width: 100%; transition: border-color .15s ease, box-shadow .15s ease; }
-.input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+.btn-danger { color: var(--bad); }
+
+/* forms — visible labels, error near the field (see DESIGN_SYSTEM.md §forms) */
+.input { border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--panel); color: var(--fg); width: 100%; transition: border-color .15s ease, box-shadow .15s ease; min-height: 36px; }
+.input:focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--accent-soft); }
 .btn:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* tables — sticky header, tabular numerals, status never by color alone */
 table.t { width: 100%; border-collapse: collapse; font-size: 14px; }
 table.t th, table.t td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+table.t thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); }
+table.t td.num, table.t th.num { text-align: right; font-variant-numeric: tabular-nums; }
+table.t tbody tr:hover { background: var(--soft); }
 a.link { color: var(--accent); text-decoration: underline; }
-@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* KPI tile — calm white card, one accent bar, one headline number (PFD L1: one dominant weight) */
+.kpi { background: var(--panel); border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: var(--r); padding: 14px 16px; box-shadow: var(--sh1); display: grid; gap: 2px; align-content: start; min-width: 0; }
+.kpi .kpi-label { font-size: 11px; font-weight: 600; letter-spacing: .07em; text-transform: uppercase; color: var(--muted); }
+.kpi .kpi-value { font-family: var(--display); font-weight: 700; font-size: clamp(22px, 2.3vw, 30px); line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.kpi .kpi-sub { font-size: 12px; color: var(--muted); }
+.kpi.warn { border-left-color: var(--warn); }
+.kpi.bad { border-left-color: var(--bad); }
+
+/* status badge — color + text, never color alone */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 700; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.badge.good { background: color-mix(in srgb, var(--good) 14%, transparent); color: var(--good); }
+.badge.warn { background: color-mix(in srgb, var(--warn) 14%, transparent); color: var(--warn); }
+.badge.bad { background: color-mix(in srgb, var(--bad) 14%, transparent); color: var(--bad); }
+.badge .dot { width: 8px; height: 8px; border-radius: 4px; background: currentColor; display: inline-block; flex: none; }
+
+/* health strip — system status is always visible (Nielsen #1), never buried in Settings */
+.health-strip { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; border: 1px solid var(--line); border-radius: var(--r); padding: 10px 14px; background: var(--panel); font-size: 13px; box-shadow: var(--sh1); }
+.health-strip.bad { border-color: color-mix(in srgb, var(--bad) 45%, var(--line)); background: color-mix(in srgb, var(--bad) 6%, var(--panel)); }
+.health-strip.warn { border-color: color-mix(in srgb, var(--warn) 45%, var(--line)); background: color-mix(in srgb, var(--warn) 6%, var(--panel)); }
+
+/* business picker — one dot per business, canonical colors from src/lib/business.ts */
+.biz { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--line); border-radius: 999px; padding: 7px 14px 7px 8px; background: var(--panel); color: var(--fg); font-size: 13.5px; font-weight: 600; text-decoration: none; min-height: 36px; transition: border-color .15s ease, background .15s ease; }
+.biz:hover { border-color: var(--muted); background: var(--soft); }
+.biz .dot { width: 10px; height: 10px; border-radius: 5px; background: var(--biz-color, var(--muted)); display: inline-block; flex: none; }
+
+/* skeleton — loading state, never a flash of empty (PFD L0) */
+@keyframes sk-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+.skel { border-radius: 10px; background: linear-gradient(90deg, var(--soft) 0, color-mix(in srgb, var(--soft) 40%, var(--panel)) 40%, var(--soft) 80%); background-size: 800px 100%; animation: sk-shimmer 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: .01ms !important; } }

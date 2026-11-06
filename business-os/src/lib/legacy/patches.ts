@@ -192,14 +192,18 @@ export function applyPatches(html: string, patches = PATCHES): string {
   return out;
 }
 
-/** Full HTML document: the legacy file is an artifact body, so add the document shell and the compatibility shim. */
+/** Full HTML document: the legacy file is an artifact body, so add the document shell and the compatibility shim.
+ * The redesign stylesheet loads AFTER the legacy file so its rules win ties —
+ * that is how the dashboard is reskinned without editing the legacy file itself
+ * (its patch layer must keep matching exactly once). See public/legacy/redesign.css
+ * and business-os/docs/DESIGN_SYSTEM.md. */
 export function legacyDocument(legacyHtml: string): string {
   return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<script src="/legacy/bos-shim.js"></script>\n'
     // phone width: let cards and selects shrink instead of pushing the page sideways
     + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select,.card input{max-width:100%}'
     + '.brand-m{display:none}@media (max-width:860px){.brand-m{display:flex;align-items:center;flex:none;padding:0 6px 0 2px}}</style>\n'
     + '<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/brand/favicon-32.png"><link rel="apple-touch-icon" href="/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b372f">\n'
-    + applyPatches(legacyHtml) + '\n</html>\n';
+    + applyPatches(legacyHtml) + '\n<link rel="stylesheet" href="/legacy/redesign.css">\n</html>\n';
 }
 
 /* ===== LocalServiceHQ business (agency/LRF structure) ===== */

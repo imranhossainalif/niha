@@ -8,7 +8,11 @@
 import type { PublishInput, PublishResult } from './meta';
 
 const API = 'https://api.linkedin.com';
-const VERSION = '202410';
+// LinkedIn versions are YYYYMM, supported for a minimum of one year: 202410 (Oct 2024)
+// was retired, so publishing failed with "Requested version 20241001 is not active".
+// 202610 is the latest documented version (Oct 2026, learn.microsoft.com LinkedIn
+// versioning page, checked 2026-11-09) — bump again before Oct 2027.
+const VERSION = '202610';
 type F = typeof fetch;
 
 async function li(path: string, token: string, opts: { method?: 'GET' | 'POST'; body?: unknown; f?: F } = {}) {

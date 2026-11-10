@@ -2,9 +2,10 @@
 // Connect accounts: Facebook + Instagram (one-click Facebook login, or the Meta system-user token),
 // YouTube (Google login), TikTok (TikTok login), Pinterest and LinkedIn (their own logins).
 // Each card shows what is connected and the one-time setup.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, compact, Modal, useToast, type Account } from './ui';
+import { bizName } from '@/lib/business';
 
 type Found = { network: 'facebook' | 'instagram'; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
 type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean; pinterest: boolean; linkedin: boolean };
@@ -14,26 +15,27 @@ const DESC: Record<Net, string> = {
   youtube: 'Video / Shorts upload · view, like, comment, subscriber',
   tiktok: 'Video post ba TikTok app e draft · view, like, comment, share',
   pinterest: 'Chobi pin board e · impression, save, click',
-  linkedin: 'Nijer profile e text post (company Page na) · token ~60 din',
+  linkedin: 'Nijer profile e text, chobi, video post (company Page na) · token ~60 din',
 };
 
 export function Accounts({ business, accounts, canAdmin, onChange }: { business: string; accounts: Account[]; canAdmin: boolean; onChange: () => void }) {
   const toast = useToast();
   const [prov, setProv] = useState<Prov | null>(null); const [cb, setCb] = useState('');
-  const [found, setFound] = useState<Found[] | null>(null); const [pick, setPick] = useState<string[]>([]); const [busy, setBusy] = useState('');
+  const [found, setFound] = useState<Found[] | null>(null); const [owners, setOwners] = useState<Record<string, string>>({}); const [pick, setPick] = useState<string[]>([]); const [busy, setBusy] = useState('');
   const key = (f: Found) => f.network + '_' + f.ext_id;
   useEffect(() => { api<{ providers: Prov; callbackBase: string }>(`/api/social/${business}/accounts`).then((r) => { setProv(r.providers); setCb(r.callbackBase); }).catch(() => {}); }, [business, accounts.length]);
   useEffect(() => {
-    const on = (e: MessageEvent) => { if (e.origin === location.origin && e.data && e.data.bosSocialConnected != null) { toast(e.data.bosSocialConnected ? 'Connect hoyeche ✓' : 'Connect hoyni', e.data.bosSocialConnected ? 'ok' : 'err'); onChange(); } };
+    const on = (e: MessageEvent) => { if (e.origin === location.origin && e.data && e.data.bosSocialConnected != null) { toast(e.data.bosSocialConnected ? (e.data.bosSocialPick ? 'Login hoyeche — ebar account bachai korun' : 'Connect hoyeche ✓') : 'Connect hoyni', e.data.bosSocialConnected ? 'ok' : 'err'); onChange(); if (e.data.bosSocialPick) void discoverRef.current(); } };
     window.addEventListener('message', on); return () => window.removeEventListener('message', on);
   }, [onChange, toast]);
 
   const discover = async () => {
     setBusy('meta');
-    try { const r = await api<{ found: Found[]; error: string | null }>(`/api/social/${business}/accounts?discover=1`); if (r.error) toast(r.error, 'err'); setFound(r.found); setPick(r.found.filter((f) => !accounts.some((a) => a.id === key(f))).map(key)); }
+    try { const r = await api<{ found: Found[]; error: string | null; owners?: Record<string, string> }>(`/api/social/${business}/accounts?discover=1`); if (r.error) toast(r.error, 'err'); setFound(r.found); setOwners(r.owners ?? {}); setPick([]); }
     catch (e) { toast((e as Error).message, 'err'); }
     setBusy('');
   };
+  const discoverRef = useRef(discover); discoverRef.current = discover;
   const connectMeta = async () => {
     setBusy('save');
     try { await api(`/api/social/${business}/accounts`, { method: 'POST', json: { accounts: (found ?? []).filter((f) => pick.includes(key(f))) } }); toast('Connect hoyeche ✓ — Analytics e "Ekhon data anun" chapun'); setFound(null); onChange(); }
@@ -44,7 +46,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
     const w = window.open(`/api/social/oauth/${p}/start?business=${business}`, 'bos-oauth', 'width=540,height=760');
     if (!w) toast('Popup bondho — browser e popup allow korun', 'err');
   };
-  const remove = async (a: Account) => { if (!confirm(a.name + ' disconnect korben? Ager post o data thakbe.')) return; try { await api(`/api/social/${business}/accounts?id=${encodeURIComponent(a.id)}`, { method: 'DELETE' }); toast('Disconnect hoyeche'); onChange(); } catch (e) { toast((e as Error).message, 'err'); } };
+  const remove = async (a: Account) => { if (!confirm(a.name + ' disconnect korben? Ager post o data thakbe.')) return; try { const r = await api<{ waiting?: number }>(`/api/social/${business}/accounts?id=${encodeURIComponent(a.id)}`, { method: 'DELETE' }); toast(r.waiting ? 'Disconnect hoyeche — kintu ' + r.waiting + ' ta schedule kora post ei account e jabe na (fail hobe). Calendar e dekhe thik korun.' : 'Disconnect hoyeche', r.waiting ? 'err' : 'ok'); onChange(); } catch (e) { toast((e as Error).message, 'err'); } };
 
   const card = (net: Net, action: ReactNode) => {
     const list = accounts.filter((a) => a.network === net);
@@ -102,7 +104,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
           <li><b>Instagram ke Page er sathe link:</b> Facebook e Kids Care BD Page → Settings → <i>Linked accounts</i> → Instagram → Connect. (Ei duita Meta er niyom — app diyeo lage.)</li>
           <li><b>Settings e Meta App ID boshan:</b> Dashboard → Settings → <i>Meta (InboxPilot)</i> → <i>Meta App ID</i> — ID ta <a className="lnk" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">developers.facebook.com/apps</a> → apnar app → <i>Settings → Basic</i> e paben. <i>App secret</i> o eki jaygay — jodi InboxPilot er jonno age theke bosano thake, ar lagbe na.</li>
           <li><b>Meta app e Facebook Login chalu:</b> oi app → <i>Add product</i> → <i>Facebook Login</i> → <i>Settings</i> → <i>Valid OAuth Redirect URIs</i> e eta din: <CopyCode text={cb + 'meta/callback'} /> → Save.</li>
-          <li><b>Bas, ek click:</b> upore <b>"Facebook diye connect"</b> → Facebook login → Page bachai → Allow. Page ar link-kora Instagram nijei connect hoye jabe — kono token copy/paste nai.</li>
+          <li><b>Bas, ek click:</b> upore <b>"Facebook diye connect"</b> → Facebook login → <b>shob Page tick rakhun</b> (onno business er Page o) → Allow. <i>Kono Page un-tick korle Facebook oi Page er access tule ney ar tar post bondho hoye jay.</i> Login er por kon account kon business e jabe seta apni bachai korben. Page ar link-kora Instagram nijei connect hoye jabe — kono token copy/paste nai.</li>
           <li><b>Jene rakhun:</b> login token ~60 din thake; meyad shesh hole abar ek click e connect korlei hobe. Purono system-user token er upay o ache — Settings e <i>Social media token</i> boshaile setai age use hobe.</li>
         </Guide>
         <Guide net="youtube" title="YouTube setup (Google)">
@@ -135,20 +137,22 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
           <li>App er <i>Products</i> tab theke add korun: <b>Share on LinkedIn</b> ar <b>Sign In with LinkedIn using OpenID Connect</b>.</li>
           <li>App er <i>Auth</i> tab e <i>Authorised redirect URLs</i> e eta din: <CopyCode text={cb + 'linkedin/callback'} /></li>
           <li>Eki <i>Auth</i> tab er <b>Client ID</b> ar <b>Primary Client Secret</b> → Dashboard → Settings → <i>LinkedIn</i> → Save → upore <b>"LinkedIn diye connect"</b> → nijer LinkedIn diye login → Allow.</li>
-          <li><b>Jene rakhun:</b> post jabe apnar <b>nijer profile</b> e (company Page e post korte LinkedIn er alada approval lage — ekhane nai). Prothom phase e shudhu <b>text post</b> (link thakle lekhar sheshe jabe); chobi post ekhono na. Login token <b>~60 din</b> thake ar refresh hoy na — meyad shesh hole abar ek click e connect korlei hobe.</li>
+          <li><b>Jene rakhun:</b> post jabe apnar <b>nijer profile</b> e (company Page e post korte LinkedIn er alada approval lage — ekhane nai). Text, <b>chobi (1–20 ta)</b> ba <b>ekta video</b> — kintu video ar chobi mishano jabe na. Link thakle lekhar sheshe jabe. Ek-i lekha duibar post korle LinkedIn nibe na. Login token <b>~60 din</b> thake ar refresh hoy na — meyad shesh hole abar ek click e connect korlei hobe.</li>
         </Guide>
       </section>
 
       {found && (
         <Modal onClose={() => setFound(null)} width={560}>
           <div className="stack" style={{ padding: 20 }}>
-            <h2>Kon gulo Kids Care e connect korben?</h2>
+            <h2>Kon gulo {bizName(business)} e connect korben?</h2>
+            <span className="muted xs">Ekta account ekta business e-i thake. Onno business e connect kora gulo ekhane niye neya jay na — age oikhane Disconnect korun.</span>
             {!found.length && <p className="muted">Kono page pawa jayni — upore Facebook setup er 3-5 step dekhun.</p>}
             {found.map((f) => (
-              <label key={key(f)} className="sm-acc" style={{ cursor: 'pointer' }}>
-                <input type="checkbox" checked={pick.includes(key(f))} onChange={(e) => setPick((p) => (e.target.checked ? [...p, key(f)] : p.filter((x) => x !== key(f))))} />
+              <label key={key(f)} className="sm-acc" style={{ cursor: owners[key(f)] || accounts.some((a) => a.id === key(f)) ? 'default' : 'pointer', opacity: owners[key(f)] ? 0.6 : 1 }}>
+                <input type="checkbox" disabled={!!owners[key(f)] || accounts.some((a) => a.id === key(f))} checked={pick.includes(key(f))} onChange={(e) => setPick((p) => (e.target.checked ? [...p, key(f)] : p.filter((x) => x !== key(f))))} />
                 <Avatar a={f} size={34} /><div className="grow"><b>{f.name}</b><div className="muted xs">{NET_NAME[f.network]}{f.username ? ' · @' + f.username : ''} · {compact(f.followers)} follower</div></div>
-                {accounts.some((a) => a.id === key(f)) && <span className="sm-badge">age theke</span>}
+                {accounts.some((a) => a.id === key(f)) && <span className="sm-badge">ekhane connect ache</span>}
+                {owners[key(f)] && <span className="sm-badge">{bizName(owners[key(f)])} e ache</span>}
               </label>
             ))}
             {found.length > 0 && !found.some((f) => f.network === 'instagram') && <span className="sm-warn"><Icon name="alert" />Instagram dekha jacche na — Instagram Page er sathe link kora ache kina ar token e instagram permission ache kina dekhun.</span>}

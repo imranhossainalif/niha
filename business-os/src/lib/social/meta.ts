@@ -4,7 +4,7 @@
 // on the fly, so no page token is ever stored.
 // Facts this follows: Meta removed posting to Groups from the API (2024); Instagram needs a public media URL and
 // can't post text only; Facebook Page post metrics need pages_read_engagement + read_insights.
-import { cfg, readSecret } from '../config';
+import { cfg, readSecret, saveSecret } from '../config';
 
 export const GRAPH = 'https://graph.facebook.com/v21.0';
 export type Network = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'pinterest' | 'linkedin';
@@ -21,7 +21,17 @@ export async function graph(path: string, opts: { token: string; method?: 'GET' 
   const put = (k: string, v: unknown) => (opts.method === 'POST' ? body : url.searchParams).set(k, typeof v === 'string' ? v : JSON.stringify(v));
   for (const [k, v] of Object.entries(opts.params ?? {})) if (v !== undefined && v !== null && v !== '') put(k, v);
   put('access_token', opts.token);
-  const r = await f(url.toString(), { method: opts.method ?? 'GET', ...(opts.method === 'POST' ? { body } : {}), signal: AbortSignal.timeout(120000) });
+  // A network blink ("fetch failed") is retried — but only where doing it twice is harmless: reads, and creating an
+  // Instagram media container. Calls that publish (media_publish, feed, photos, videos) are never repeated here.
+  const safe = (opts.method ?? 'GET') === 'GET' || /\/media$/.test(path);
+  let r: Response | undefined;
+  for (let i = 0; ; i++) {
+    try { r = await f(url.toString(), { method: opts.method ?? 'GET', ...(opts.method === 'POST' ? { body } : {}), signal: AbortSignal.timeout(120000) }); break; }
+    catch (e) {
+      if (!safe || i >= 2) throw new GraphError('Meta er sathe network e connect hoy nai (' + String((e as Error).message || e) + ') — ektu pore abar chesta hobe');
+      await new Promise((res) => setTimeout(res, opts.f ? 0 : 1500 * (i + 1)));
+    }
+  }
   const j: any = await r.json().catch(() => ({}));
   if (!r.ok || j.error) throw new GraphError(j.error?.error_user_msg || j.error?.message || 'Meta API ' + r.status, j.error?.code, r.status);
   return j;
@@ -116,6 +126,13 @@ export async function metaTokens(): Promise<string[]> {
 
 const pageTokens = new Map<string, { t: string; at: number }>();
 /**
+ * Page tokens saved at connect time (encrypted secret 'meta:page:<id>'). A Page token made from a long-lived user token does
+ * not expire, so it keeps publishing even when the user token behind it has lapsed. It is only a FALLBACK: derived tokens are
+ * tried first, and if Facebook has revoked the Page's access (the person un-ticked it in a later login) it fails like before.
+ */
+export const savePageToken = (pageId: string, token: string) => saveSecret('meta:page:' + pageId, { token, at: Date.now() });
+const storedPageToken = async (pageId: string) => (await readSecret<{ token: string }>('meta:page:' + pageId).catch(() => null))?.token;
+/**
  * Page access token for a page (cached 30 min). `user` may be a list of candidate user tokens — the
  * first one that can manage this page wins, and if none can, the LAST Graph error is thrown (so the
  * failure stored on the post is Meta's real message, not a generic one).
@@ -129,16 +146,22 @@ export async function pageToken(pageId: string, user: string | string[], f?: Fet
       const j = await graph('/' + pageId, { token: u, params: { fields: 'access_token' }, f });
       if (!j.access_token) throw new GraphError('Page ' + pageId + ' er token pawa jayni: system user ke page e "Create content" access din');
       pageTokens.set(pageId, { t: j.access_token, at: Date.now() });
+      if (!(await storedPageToken(pageId))) void savePageToken(pageId, j.access_token).catch(() => {}); // first time we see it work: keep a fallback copy
       return j.access_token;
     } catch (e) { last = e; }
+  }
+  const stored = await storedPageToken(pageId);
+  if (stored) {
+    try { await graph('/' + pageId, { token: stored, params: { fields: 'id' }, f }); pageTokens.set(pageId, { t: stored, at: Date.now() }); return stored; } catch (e) { last = e; }
   }
   throw last ?? new GraphError('Page ' + pageId + ' er token pawa jayni');
 }
 
 export type FoundAccount = { network: Network; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
 /** Pages (and their linked Instagram accounts) this token can manage. */
-export async function discoverAccounts(user: string, f?: Fetch): Promise<FoundAccount[]> {
-  const pages = await graphAll('/me/accounts', { token: user, f, params: { fields: 'id,name,picture{url},followers_count,fan_count,instagram_business_account{id,username,name,profile_picture_url,followers_count}', limit: 100 } }, 200);
+export async function discoverAccounts(user: string, f?: Fetch, keepTokens = false): Promise<FoundAccount[]> {
+  const pages = await graphAll('/me/accounts', { token: user, f, params: { fields: 'id,name,access_token,picture{url},followers_count,fan_count,instagram_business_account{id,username,name,profile_picture_url,followers_count}', limit: 100 } }, 200);
+  if (keepTokens) for (const p of pages) if (p.access_token) await savePageToken(String(p.id), p.access_token).catch(() => {});
   const out: FoundAccount[] = [];
   for (const p of pages) {
     out.push({ network: 'facebook', ext_id: p.id, name: p.name, picture: p.picture?.data?.url, followers: p.followers_count ?? p.fan_count });

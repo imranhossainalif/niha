@@ -17,7 +17,7 @@ import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
 import { recordUsage } from '../aiUsage';
 
-export type Target = { account_id: string; network: Network; name?: string; text?: string; status?: 'pending' | 'published' | 'failed'; ext_post_id?: string; permalink?: string; error?: string; note?: string; at?: string };
+export type Target = { account_id: string; network: Network; name?: string; text?: string; status?: 'pending' | 'published' | 'failed'; ext_post_id?: string; permalink?: string; error?: string; note?: string; at?: string; attempts?: number };
 export type PostOptions = { yt_title?: string; yt_privacy?: YtOptions['privacy']; yt_kids?: boolean; tt_mode?: TtOptions['mode']; tt_privacy?: TtOptions['privacy']; pin_board?: string };
 export type SocialPost = {
   business: string; status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed';
@@ -54,11 +54,11 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
         const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
           : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
           : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
-          : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f)
+          : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f, await Promise.all(post.media.map(async (m) => { const x = await mediaFile(m.id); return x ? { path: x.path, mime: x.mime, size: x.size } : undefined; })))
           : await publishVideo(a.network, a.id, post, input.text, f);
         targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
       } catch (e) {
-        targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString() });
+        targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString(), attempts: (t.attempts || 0) + 1 });
       }
       // Save progress after each target, so a crash before the final write
       // does not re-post a target that already published on retry.
@@ -92,16 +92,44 @@ async function publishVideo(net: Network, accountId: string, post: SocialPost, t
     : publishTikTok(file, text, { mode: o.tt_mode, privacy: o.tt_privacy }, token, f);
 }
 
-/** Worker, every minute: publish scheduled posts whose time has come. */
+/** A failure worth trying again on its own: the network blinked or the platform was busy (not a rejected post or a lost login). */
+export const isTransient = (err?: string) => !!err && /fetch failed|network|timeout|timed out|ECONN|ETIMEDOUT|socket|\b5\d\d\b|temporar|try again|rate limit|onek deri|(#1|#2|#4|#17|#32|#341)\b/i.test(err);
+const STUCK_MIN = 20, RETRY_AFTER_MIN = 4, RETRY_MAX = 3, RETRY_WINDOW_H = 24;
+
+/**
+ * Worker, every minute: publish scheduled posts whose time has come, give a post that was cut off mid-publish
+ * (server restart/deploy) a clear failed state, and retry targets that failed only because of a network blink.
+ */
 export async function publishDue(f?: Fetch) {
-  const now = new Date().toISOString();
+  const nowMs = Date.now(), now = new Date(nowMs).toISOString();
+  // 1) cut off while publishing: a target left 'pending' may or may not have gone out — never re-send blindly
+  for (const s of await db().collection('social_posts').where('status', '==', 'publishing').limit(100).get()) {
+    if (nowMs - Date.parse(s.updatedAt) < STUCK_MIN * 60e3) continue;
+    const post = s.data as SocialPost;
+    const targets = post.targets.map((t) => (t.status === 'published' ? t : { ...t, status: 'failed' as const, error: t.error || 'Publish majhkhane theme geche (server restart?) — ' + (t.name || t.network) + ' e post hoyeche kina dekhe nin, na hole "Retry" chapun', at: now }));
+    const okN = targets.filter((t) => t.status === 'published').length;
+    await db().collection('social_posts').doc(s.id).set({ ...post, targets, status: okN === targets.length ? 'published' : okN ? 'partial' : 'failed', error: targets.filter((t) => t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ') } as unknown as Data).catch(() => null);
+  }
+  // 2) transient failures of a recent scheduled post: try again (at most RETRY_MAX times, a few minutes apart)
+  const retry: string[] = [];
+  for (const st of ['failed', 'partial'] as const) {
+    for (const s of await db().collection('social_posts').where('status', '==', st).limit(200).get()) {
+      const post = s.data as SocialPost;
+      const at = Date.parse(post.scheduled_at || '');
+      if (!at || nowMs - at > RETRY_WINDOW_H * 3600e3) continue;
+      const bad = post.targets.filter((t) => t.status === 'failed');
+      if (bad.length && bad.every((t) => isTransient(t.error) && (t.attempts || 0) < RETRY_MAX && nowMs - Date.parse(t.at || '') > RETRY_AFTER_MIN * 60e3)) retry.push(s.id);
+    }
+  }
+  const retried: { id: string; status: string }[] = [];
+  for (const id of retry) { try { retried.push({ id, status: (await publishPost(id, SYSTEM, f)).status }); } catch (e) { retried.push({ id, status: 'error: ' + (e as Error).message }); } }
   const due = (await db().collection('social_posts').where('status', '==', 'scheduled').limit(500).get())
     .filter((s) => (s.data as SocialPost).scheduled_at && (s.data as SocialPost).scheduled_at! <= now);
   const out: { id: string; status: string }[] = [];
   for (const s of due) {
     try { out.push({ id: s.id, status: (await publishPost(s.id, SYSTEM, f)).status }); } catch (e) { out.push({ id: s.id, status: 'error: ' + (e as Error).message }); }
   }
-  return { due: due.length, results: out };
+  return { due: due.length, results: out, retried };
 }
 
 /** Pull posts (last `days`), metrics, followers, IG audience and competitors for every connected account. */

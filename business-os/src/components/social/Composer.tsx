@@ -56,6 +56,8 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
     if (nets.includes('instagram') && media.length > 10) p.push('Instagram e 10 tar beshi na.');
     if (nets.includes('facebook') && media.length > 1 && media.some(isVideo)) p.push('Facebook e video ekta-i (chobir sathe na).');
     for (const n of ['youtube', 'tiktok'] as Net[]) if (nets.includes(n) && (media.length !== 1 || !isVideo(media[0]))) p.push(NET_NAME[n] + ' e ekta video lagbe (chobi na).');
+    if (nets.includes('linkedin') && media.some(isVideo) && media.length > 1) p.push('LinkedIn e ek post e ekta video, ba shudhu chobi (video + chobi mishano jay na).');
+    if (nets.includes('linkedin') && media.length > 20) p.push('LinkedIn e 20 tar beshi chobi na.');
     if (nets.includes('pinterest') && !media.some((m) => !isVideo(m))) p.push('Pinterest e chobi lagbe (video pin ekhono na).');
     for (const a of chosen) if (textFor(a.id).length > LIMIT[a.network]) p.push(a.name + ' (' + NET_NAME[a.network] + '): lekha ' + LIMIT[a.network] + ' okkhorer beshi.');
     if (!media.length && !text.trim() && !link) p.push('Kichu likhun ba chobi/video din.');
@@ -261,7 +263,7 @@ export function PostPreview({ a, text, media, link, title }: { a: Account; text:
   if (a.network === 'linkedin') return (
     <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="row" style={{ padding: 10 }}><Avatar a={a} size={34} /><div><b className="sm-t">{name}</b><div className="muted xs">LinkedIn · Ekhon · 🌐</div></div></div>
-      <div style={{ padding: '0 12px 12px' }}>{body}{link && <div className="muted xs" style={{ marginTop: 8 }}>🔗 {link}</div>}<div className="muted xs" style={{ marginTop: 8 }}>Shudhu lekha jabe — chobi/video ekhono na.</div></div>
+      <div style={{ padding: '0 12px 12px' }}>{body}{link && <div className="muted xs" style={{ marginTop: 8 }}>🔗 {link}</div>}{media.length > 0 && <div className="muted xs" style={{ marginTop: 8 }}>{media.some(isVideo) ? '🎬 Video' : '🖼 ' + media.length + ' ta chobi'} shoho jabe.</div>}</div>
     </div>);
   return (
     <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>

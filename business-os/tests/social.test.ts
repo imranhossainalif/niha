@@ -185,3 +185,21 @@ describe('YouTube + TikTok (mocked)', async () => {
     expect(r.note).toMatch(/TikTok app/);
   });
 });
+
+describe('Meta network blinks', () => {
+  it('a read is retried after "fetch failed"; a publishing call is not', async () => {
+    const { graph } = await import('@/lib/social/meta');
+    let n = 0;
+    const flaky: Fetch = (async () => { if (++n < 3) throw new TypeError('fetch failed'); return new Response(JSON.stringify({ id: 'ok' }), { status: 200 }); }) as Fetch;
+    expect(await graph('/123', { token: 'T', f: flaky })).toEqual({ id: 'ok' });
+    expect(n).toBe(3);
+    let m = 0;
+    const down: Fetch = (async () => { m++; throw new TypeError('fetch failed'); }) as Fetch;
+    await expect(graph('/P1/feed', { token: 'T', method: 'POST', f: down, params: { message: 'x' } })).rejects.toThrow(/network e connect hoy nai/);
+    expect(m).toBe(1); // never repeated: it could have posted twice
+    let k = 0;
+    const down2: Fetch = (async () => { k++; throw new TypeError('fetch failed'); }) as Fetch;
+    await expect(graph('/IG1/media', { token: 'T', method: 'POST', f: down2, params: { image_url: 'u' } })).rejects.toThrow();
+    expect(k).toBe(3); // creating a media container is harmless to repeat
+  });
+});

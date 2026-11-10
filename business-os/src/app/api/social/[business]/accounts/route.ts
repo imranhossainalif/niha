@@ -4,6 +4,7 @@ import { handle, json } from '@/lib/http';
 import { needPrincipal } from '@/lib/apiutil';
 import { isFull } from '@/lib/access';
 import { needBiz } from '@/lib/social/api';
+import { bizName } from '@/lib/business';
 import { discoverAccounts, metaUserToken, socialToken } from '@/lib/social/meta';
 import { cfg, deleteSecret } from '@/lib/config';
 import type { SocialAccount } from '@/lib/jobs/social';
@@ -23,8 +24,11 @@ export const GET = handle(async (req: Request, { params }: Ctx) => {
   if (new URL(req.url).searchParams.get('discover') !== '1') return json({ connected, providers, callbackBase });
   adminOnly(p);
   let found: Awaited<ReturnType<typeof discoverAccounts>> = [], error: string | null = null;
-  try { found = await discoverAccounts(await socialToken()); } catch (e) { error = (e as Error).message; }
-  return json({ connected, providers, callbackBase, found, error });
+  try { found = await discoverAccounts(await socialToken(), undefined, true); } catch (e) { error = (e as Error).message; }
+  // which business already holds each account, so the picker can show it (an account lives in exactly one business)
+  const owners: Record<string, string> = {};
+  for (const s of await db(p).collection('social_accounts').limit(500).get()) { const b = (s.data as SocialAccount).business; if (b && b !== business) owners[s.id] = b; }
+  return json({ connected, providers, callbackBase, found, error, owners });
 });
 
 const Body = z.object({ accounts: z.array(z.object({ network: z.enum(['facebook', 'instagram']), ext_id: z.string(), name: z.string(), username: z.string().optional(), picture: z.string().optional(), followers: z.number().optional(), page_id: z.string().optional() })).max(30) });
@@ -35,9 +39,15 @@ export const POST = handle(async (req: Request, { params }: Ctx) => {
   const p = await needPrincipal(req, 'write');
   needBiz(p, business, true); adminOnly(p);
   const b = Body.parse(await req.json());
+  // Never take an account away from another business silently: that is how "adding one removed another" happened.
+  const taken: string[] = [];
   for (const a of b.accounts) {
-    await db(p).collection('social_accounts').doc(a.network + '_' + a.ext_id).set({ business, ...a, page_id: a.network === 'facebook' ? a.ext_id : a.page_id || '', active: true, connected_at: new Date().toISOString() });
+    const ref = db(p).collection('social_accounts').doc(a.network + '_' + a.ext_id);
+    const cur = (await ref.get())?.data as SocialAccount | undefined;
+    if (cur && cur.business && cur.business !== business) { taken.push(a.name + ' (' + bizName(cur.business) + ')'); continue; }
+    await ref.set({ ...(cur ?? {}), business, ...a, page_id: a.network === 'facebook' ? a.ext_id : a.page_id || '', active: true, connected_at: cur ? (cur as { connected_at?: string }).connected_at || new Date().toISOString() : new Date().toISOString(), error: '' });
   }
+  if (taken.length) throw Object.assign(new Error('Ei account gulo onno business e connect kora ache: ' + taken.join(', ') + ' — age oikhane Disconnect korun, tarpor ekhane connect korun'), { status: 409, code: 'conflict' });
   return json({ connected: b.accounts.length });
 });
 
@@ -47,6 +57,12 @@ export const DELETE = handle(async (req: Request, { params }: Ctx) => {
   const p = await needPrincipal(req, 'write');
   needBiz(p, business, true); adminOnly(p);
   const id = new URL(req.url).searchParams.get('id') || '';
-  await deleteSecret('oauth:' + id); // YouTube/TikTok login token
-  return json({ deleted: await db(p).collection('social_accounts').doc(id).delete() });
+  const ref = db(p).collection('social_accounts').doc(id);
+  const cur = (await ref.get())?.data as SocialAccount | undefined;
+  // only this business's own account: a stray id must never remove another business's login
+  if (!cur || cur.business !== business) throw Object.assign(new Error('Ei business e ei account nai'), { status: 404, code: 'not_found' });
+  await deleteSecret('oauth:' + id); // YouTube/TikTok/LinkedIn/Pinterest login token
+  // posts still waiting for this account would fail at their time: tell the caller how many
+  const waiting = (await db(p).collection('social_posts').where('business', '==', business).limit(2000).get()).filter((s) => { const d = s.data as { status?: string; targets?: { account_id: string; status?: string }[] }; return d.status === 'scheduled' && (d.targets ?? []).some((t) => t.account_id === id && t.status !== 'published'); }).length;
+  return json({ deleted: await ref.delete(), waiting });
 });

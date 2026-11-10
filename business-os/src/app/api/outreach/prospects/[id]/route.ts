@@ -1,4 +1,4 @@
-import { db } from '@/lib/db';
+import { ConflictError, db } from '@/lib/db';
 import { handle, json } from '@/lib/http';
 import { needPrincipal } from '@/lib/apiutil';
 import { cleanProspect, type Activity, type Prospect } from '@/lib/outreach/core';
@@ -33,7 +33,9 @@ export const PATCH = handle(async (req: Request, { params }: Ctx) => {
     const dup = b.force ? undefined : findDup(await allProspects(p), next, id);
     if (dup) return json({ error: { code: 'duplicate', message: 'Another prospect already has this link/email: ' + dup.name }, duplicate: dup }, 409);
   }
-  const saved = await ref.set(JSON.parse(JSON.stringify(next)));
+  let saved;
+  try { saved = await ref.set(JSON.parse(JSON.stringify(next)), b.version != null ? { expectedVersion: Number(b.version) } : {}); }
+  catch (e) { if (e instanceof ConflictError) return json({ error: { code: 'version_conflict', message: 'Someone else changed this prospect a moment ago. Close it and open it again, then redo your edit.' } }, 409); throw e; }
   return json({ prospect: { ...next, id, version: saved.version } });
 });
 

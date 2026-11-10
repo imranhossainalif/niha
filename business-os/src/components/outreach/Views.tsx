@@ -80,7 +80,7 @@ export function Dashboard({ c, goto }: { c: Ctx; goto: (tab: 'queue' | 'list' | 
         <Kpi label="Clients won" value={String(t.won)} delta={delta(t.won, p.won)} icon="check" />
       </div>
 
-      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
+      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))' }}>
         <section className="sm-card stack"><h2>Funnel for this period</h2>
           <Funnel steps={[['Requests', t.connect], ['Accepted', t.accepted], ['First messages', st.steps[1]?.sent || 0], ['People replied', st.repliedPeople], ['Positive', t.positive], ['Meetings', t.meeting], ['Won', t.won]]} />
         </section>
@@ -97,7 +97,7 @@ export function Dashboard({ c, goto }: { c: Ctx; goto: (tab: 'queue' | 'list' | 
         <p className="muted xs">Accept rate = accepted ÷ requests sent in this period. Reply rate = replies ÷ messages sent in this period.</p>
       </section>
 
-      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))' }}>
         <section className="sm-card stack"><h2>Which message gets the reply</h2>
           {steps.length ? <table className="or-tbl"><thead><tr><th>Step</th><th className="n">Sent</th><th className="n">Replies after it</th><th className="n">Reply rate</th></tr></thead>
             <tbody>{steps.map((x) => <tr key={x.k}><td><b>Msg {x.k}{x.k >= 9 ? '+' : ''}</b></td><td className="n">{x.sent}</td><td className="n">{x.replies}</td><td className="n"><BarCell value={pctNum(x.replies, x.sent)} max={100} color="var(--good)">{rate(x.replies, x.sent)}</BarCell></td></tr>)}</tbody></table>
@@ -124,7 +124,7 @@ export function Dashboard({ c, goto }: { c: Ctx; goto: (tab: 'queue' | 'list' | 
         <p className="muted xs">Grey numbers are the target for this period ({s.targets.connect} requests, {s.targets.msg} messages, {s.targets.touch} touches per rep per day). Change them in Settings.</p>
       </section>
 
-      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
+      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))' }}>
         <section className="sm-card stack"><h2>Pipeline now</h2><span className="muted xs">All {c.prospects.length} prospects by relationship stage.</span>
           <Shares items={s.stages.map((x) => ({ label: x.label, value: c.prospects.filter((y) => y.stage === x.id).length, color: x.color }))} />
         </section>
@@ -138,7 +138,7 @@ export function Dashboard({ c, goto }: { c: Ctx; goto: (tab: 'queue' | 'list' | 
 
       <section className="sm-card stack">
         <h2>Our account limits (today)</h2>
-        {usage.length ? <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>{usage.map((u) => (
+        {usage.length ? <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))' }}>{usage.map((u) => (
           <div key={u.sender.id} className="or-prof">
             <div className="row"><Pf s={s} id={u.sender.platform} /><b>{u.sender.name}</b></div>
             <Meter label="Requests today" v={u.day_connect} max={u.sender.day_connect} />
@@ -240,7 +240,8 @@ export function Filters({ c, f, setF }: { c: Ctx; f: F; setF: (f: F) => void }) 
     </div>
   );
 }
-const esc = (v: unknown) => { const t = String(v ?? ''); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+// a cell that starts with = + - @ would run as a formula when the CSV is opened in Excel / Sheets: prefix it
+const esc = (v: unknown) => { let t = String(v ?? ''); if (/^[=+\-@\t\r]/.test(t) && !/^-?\d+(\.\d+)?$/.test(t)) t = "'" + t; return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
 const download = (name: string, text: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv' })); a.download = name; a.click(); };
 function csvOf(list: Prospect[], c: Ctx) {
   const cols = ['name', 'company', 'role', 'industry', 'size', 'country', 'city', 'website', 'email', 'phone', 'brand', 'source', 'stage', 'reply_status', 'sales_stage', 'owner', 'next_action', 'next_due', 'touches'] as const;
@@ -311,18 +312,20 @@ export function Pipeline({ c, f, setF, move }: { c: Ctx; f: F; setF: (f: F) => v
   const [drag, setDrag] = useState<string | null>(null); const [over, setOver] = useState<string | null>(null);
   const cols = mode === 'stage' ? s.stages : s.sales_stages;
   const list = useMemo(() => c.prospects.filter((p) => match(p, f, c)), [c, f]);
-  const drop = (col: string) => { const p = c.prospects.find((x) => x.id === drag); if (p && (p[mode] || cols[0].id) !== col) move(p, { [mode]: col }); setDrag(null); setOver(null); };
+  // a stage that was deleted in Settings must not make its prospects vanish from the board: they sit in the first column
+  const colOf = (p: Prospect) => (cols.some((x) => x.id === p[mode]) ? (p[mode] as string) : cols[0].id);
+  const drop = (col: string) => { const p = c.prospects.find((x) => x.id === drag); if (p && colOf(p) !== col) move(p, { [mode]: col }); setDrag(null); setOver(null); };
   return (
     <div className="sm-grid">
       <section className="sm-card stack"><div className="row"><Seg value={mode} onChange={setMode} items={[['stage', 'Relationship'], ['sales_stage', 'Sales']]} /><span className="muted xs">Drag a card to another column, or click it to open.</span></div><Filters c={c} f={f} setF={setF} /></section>
-      <div className="or-kan">{cols.map((col) => { const items = list.filter((p) => (p[mode] || cols[0].id) === col.id); const value = items.reduce((n, p) => n + (p.deal_value || 0), 0); return (
+      <div className="or-kan">{cols.map((col) => { const items = list.filter((p) => colOf(p) === col.id); const value = items.reduce((n, p) => n + (p.deal_value || 0), 0); return (
         <div key={col.id} className="or-col" style={over === col.id ? { outline: '2px dashed var(--accent)' } : undefined} onDragOver={(e) => { e.preventDefault(); setOver(col.id); }} onDragLeave={() => setOver(null)} onDrop={() => drop(col.id)}>
           <div className="row"><b style={{ color: col.color }}>{col.label}</b><span className="sm-badge">{items.length}</span>{mode === 'sales_stage' && value > 0 && <span className="muted xs">{value.toLocaleString('en-US')}</span>}</div>
           {items.slice(0, 40).map((p) => (
             <div key={p.id} className="or-kcard" draggable onDragStart={() => setDrag(p.id!)} onDragEnd={() => { setDrag(null); setOver(null); }} onClick={() => c.open(p)}>
               <b>{p.name}{p.awaiting ? ' •' : ''}</b><span className="muted xs">{[p.company, p.city].filter(Boolean).join(' · ') || '—'}</span>
               <span className="row" style={{ gap: 4 }}>{p.profiles.slice(0, 3).map((x, i) => <Pf key={i} s={s} id={x.platform} off={!(x.connected || x.back)} />)}</span>
-              <select className="sm-input" style={{ height: 28, fontSize: 12 }} aria-label="Move to" value={col.id} onClick={(e) => e.stopPropagation()} onChange={(e) => move(p, { [mode]: e.target.value })}>{cols.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>
+              <select className="sm-input" style={{ height: 28, fontSize: 12 }} aria-label="Move to" value={colOf(p)} onClick={(e) => e.stopPropagation()} onChange={(e) => move(p, { [mode]: e.target.value })}>{cols.map((x) => <option key={x.id} value={x.id}>{x.label}</option>)}</select>
             </div>))}
           {items.length > 40 && <span className="muted xs">+{items.length - 40} more</span>}
         </div>); })}</div>
@@ -372,7 +375,7 @@ export function Report({ c, f, setF }: { c: Ctx; f: F; setF: (f: F) => void }) {
           <Kpi label="Meetings" value={String(all.meeting)} note={rate(all.meeting, all.contacted) + ' of reached'} />
           <Kpi label="Clients" value={String(all.won)} note={all.value ? 'Value ' + all.value.toLocaleString('en-US') : rate(all.won, all.meeting) + ' of meetings'} />
         </div>
-        <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(340px, 1fr))' }}>
+        <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))' }}>
           <section className="sm-card stack"><h2>Funnel (these prospects)</h2><Funnel steps={[['Prospects', all.n], ['Reached', all.contacted], ['Connected', all.connected], ['Replied', all.replied], ['Positive', all.positive], ['Meetings', all.meeting], ['Clients', all.won]]} /></section>
           <section className="sm-card stack"><h2>What stands out <Label k="FACT" /></h2>
             {solid.length >= 2 ? <>

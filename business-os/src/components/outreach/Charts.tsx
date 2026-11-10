@@ -31,7 +31,7 @@ export function Funnel({ steps }: { steps: [string, number][] }) {
   return (
     <div className="stack" style={{ gap: 7 }}>
       {steps.map(([label, v], i) => { const prev = i ? steps[i - 1][1] : 0; return (
-        <div key={label} style={{ display: 'grid', gridTemplateColumns: '120px 1fr 96px', gap: 10, alignItems: 'center' }}>
+        <div key={label} style={{ display: 'grid', gridTemplateColumns: 'minmax(70px, 120px) minmax(0, 1fr) minmax(64px, 96px)', gap: 10, alignItems: 'center' }}>
           <span className="sm-t" style={{ fontWeight: 600 }}>{label}</span>
           <div style={{ background: 'var(--soft)', borderRadius: 8, height: 26, overflow: 'hidden' }}><div style={{ width: Math.max(v ? 2 : 0, (v / top) * 100) + '%', height: '100%', borderRadius: 8, background: `color-mix(in srgb, var(--accent) ${100 - i * 9}%, var(--info))`, transition: 'width .4s var(--ease)' }} /></div>
           <span style={{ textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}><b>{v}</b>{i > 0 && <span className="muted xs"> · {prev ? Math.round((v / prev) * 100) + '%' : '—'}</span>}</span>

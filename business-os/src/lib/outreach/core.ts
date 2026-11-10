@@ -68,8 +68,22 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 /** Saved settings over the defaults (a list saved as [] stays empty only for the user-made lists). */
+const txt = (v: unknown, n = 120) => (typeof v === 'string' ? v : v == null ? '' : String(v)).slice(0, n);
+const lines = (l: unknown) => (Array.isArray(l) ? [...new Set(l.map((x) => txt(x).trim()).filter(Boolean))].slice(0, 200) : undefined);
+const opts = (l: unknown) => (Array.isArray(l) ? l.filter((x) => x && typeof x === 'object' && txt((x as any).id) && txt((x as any).label)).slice(0, 60).map((x: any) => ({ ...x, id: txt(x.id, 40), label: txt(x.label, 60), color: /^#[0-9a-f]{3,8}$/i.test(txt(x.color, 9)) ? x.color : undefined, ...(x.connect !== undefined ? { connect: txt(x.connect, 60), back: txt(x.back, 60) } : {}) })) : undefined);
+/** Whatever was saved, cleaned: known list shapes only, bounded sizes, hex colours. */
+function clean(saved: Partial<Settings>): Partial<Settings> {
+  const o: Record<string, unknown> = { ...saved };
+  for (const k of ['industries', 'sizes', 'roles', 'brands', 'reps', 'lost_reasons'] as const) { const v = lines(saved[k]); if (v) o[k] = v; else delete o[k]; }
+  for (const k of ['platforms', 'stages', 'reply_statuses', 'sales_stages'] as const) { const v = opts(saved[k]); if (v) o[k] = v; else delete o[k]; }
+  if (Array.isArray(saved.senders)) o.senders = saved.senders.filter((x) => x && txt(x.id) && txt(x.name)).slice(0, 40).map((x) => ({ id: txt(x.id, 40), platform: txt(x.platform, 40), name: txt(x.name, 80), day_connect: Math.max(0, Number(x.day_connect) || 0), week_connect: Math.max(0, Number(x.week_connect) || 0), day_msg: Math.max(0, Number(x.day_msg) || 0) })); else delete o.senders;
+  if (Array.isArray(saved.fields)) o.fields = saved.fields.filter((x) => x && txt(x.id) && txt(x.label)).slice(0, 40).map((x) => ({ id: txt(x.id, 40), label: txt(x.label, 60), type: (['text', 'number', 'select', 'date', 'link', 'check'] as const).includes(x.type) ? x.type : 'text', options: Array.isArray(x.options) ? x.options.map((t) => txt(t, 60)).filter(Boolean).slice(0, 60) : undefined })); else delete o.fields;
+  if (Array.isArray(saved.actions)) o.actions = saved.actions.filter((x) => x && txt(x.id) && txt(x.label)).slice(0, 40).map((x) => ({ id: txt(x.id, 40), label: txt(x.label, 60), kind: (['touch', 'msg', 'none'] as const).includes(x.kind) ? x.kind : 'touch' })); else delete o.actions;
+  if (Array.isArray(saved.templates)) o.templates = saved.templates.filter((x) => x && txt(x.id) && txt(x.label)).slice(0, 80).map((x) => ({ id: txt(x.id, 40), label: txt(x.label, 80), text: txt(x.text, 3000) })); else delete o.templates;
+  return o as Partial<Settings>;
+}
 export function mergeSettings(saved: Partial<Settings> | null | undefined): Settings {
-  const s = { ...DEFAULT_SETTINGS, ...(saved || {}) } as Settings;
+  const s = { ...DEFAULT_SETTINGS, ...clean(saved || {}) } as Settings;
   for (const k of ['platforms', 'stages', 'reply_statuses', 'sales_stages'] as const) if (!Array.isArray(s[k]) || !s[k].length) (s as any)[k] = DEFAULT_SETTINGS[k];
   for (const k of ['industries', 'sizes', 'roles', 'brands', 'reps', 'lost_reasons', 'senders', 'fields', 'actions', 'templates'] as const) if (!Array.isArray(s[k])) (s as any)[k] = DEFAULT_SETTINGS[k];
   s.targets = { ...DEFAULT_SETTINGS.targets, ...(s.targets || {}) };
@@ -140,9 +154,10 @@ export function cleanProspect(b: Record<string, any>, s: Settings): Partial<Pros
   if ('profiles' in b && Array.isArray(b.profiles)) {
     const seen = new Set<string>();
     o.profiles = b.profiles.map((x: any): Profile => {
-      const url = str(x?.url, 500);
+      let url = str(x?.url, 500);
+      if (/^[a-z][a-z0-9+.-]*:/i.test(url) && !/^https?:\/\//i.test(url)) url = ''; // javascript:, data: … are never kept as a profile link
       return { platform: str(x?.platform, 40) || platformOf(url), url, handle: str(x?.handle, 100) || undefined, out: x?.out || null, back: x?.back || null, connected: !!x?.connected, msgs: Math.max(0, Number(x?.msgs) || 0), last_msg: x?.last_msg || null, replied: x?.replied || null, replies: Math.max(0, Number(x?.replies) || 0), last_tpl: x?.last_tpl ? str(x.last_tpl, 60) : undefined };
-    }).filter((x: Profile) => { const k = x.platform + '|' + normUrl(x.url); if ((!x.url && !x.platform) || seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12);
+    }).filter((x: Profile) => { const k = x.platform + '|' + normUrl(x.url); if ((!x.url && !x.out && !x.back && !x.msgs && !x.replies) || seen.has(k)) return false; seen.add(k); return true; }).slice(0, 12); // a blank row with no history is not a profile
   }
   if (o.stage && !s.stages.some((x) => x.id === o.stage)) delete o.stage;
   return o;
@@ -250,11 +265,17 @@ export function queues(prospects: Prospect[], today: string, s: Settings) {
 }
 
 /** Undo support: rebuild the counters of a prospect from its remaining log. Stage and statuses the team set by hand are kept. */
-export function rebuild(p0: Prospect, acts: Activity[], s: Settings): Prospect {
+export function rebuild(p0: Prospect, acts: Activity[], s: Settings, undone?: Activity): Prospect {
   let p: Prospect = { ...p0, touches: 0, first_touch: undefined, last_touch: undefined, last_in: undefined, awaiting: false,
     profiles: (p0.profiles || []).filter((x) => x.url).map((x) => ({ platform: x.platform, url: x.url, handle: x.handle, out: null, back: null, connected: false, msgs: 0, last_msg: null, replied: null, replies: 0 })) };
   for (const a of [...acts].sort((x, y) => x.at.localeCompare(y.at))) p = applyActivity(p, a, s).prospect;
-  return { ...p, stage: p0.stage, reply_status: p.last_in ? p0.reply_status : 'none', sales_stage: p0.sales_stage, lost_reason: p0.lost_reason };
+  // The sales stage can be set by hand in the Pipeline, so it is only recalculated when the undone entry WAS a sales step.
+  let sales = p0.sales_stage;
+  if (undone && actionKind(undone.type, s) === 'deal') {
+    const last = [...acts].filter((a) => actionKind(a.type, s) === 'deal').sort((x, y) => x.at.localeCompare(y.at)).pop();
+    sales = last ? ({ meeting: 'meeting', meeting_done: 'meeting_done', proposal: 'proposal', won: 'won', lost: 'lost' } as Record<string, string>)[last.type] || p0.sales_stage : 'prospect';
+  }
+  return { ...p, stage: p0.stage, reply_status: p.last_in ? p0.reply_status : 'none', sales_stage: sales, lost_reason: sales === 'lost' ? p0.lost_reason : undefined };
 }
 
 /** Day list between two days (inclusive), for zero-filled charts. */

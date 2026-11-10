@@ -138,3 +138,25 @@ describe('outreach: undo and templates', () => {
     expect(st.templates.t1).toEqual({ sent: 1, replies: 1 }); expect(st.sentiments).toEqual({ not_now: 1 }); expect(st.repliedPeople).toBe(1);
   });
 });
+
+describe('outreach: review fixes', () => {
+  it('undoing a sales step steps the sales stage back; a stage set by hand in the Pipeline survives undoing a plain message', () => {
+    const acts = [A('msg', 'linkedin', '2026-11-10T04:00:00.000Z'), A('meeting', undefined, '2026-11-11T04:00:00.000Z'), A('proposal', undefined, '2026-11-12T04:00:00.000Z')];
+    const { p } = run(P(), acts);
+    expect(p.sales_stage).toBe('proposal');
+    expect(rebuild(p, acts.slice(0, 2), S, acts[2]).sales_stage).toBe('meeting');
+    expect(rebuild({ ...p, sales_stage: 'qualified' }, [acts[1], acts[2]], S, acts[0]).sales_stage).toBe('qualified');
+    expect(rebuild(p, [acts[0]], S, acts[1]).sales_stage).toBe('prospect');
+  });
+  it('a blank profile row with no history is dropped, one with history is kept', () => {
+    const c = cleanProspect({ name: 'A', profiles: [{ url: '' }, { platform: 'instagram', url: '', out: '2026-11-10T04:00:00.000Z' }] }, S);
+    expect(c.profiles).toHaveLength(1); expect(c.profiles![0].platform).toBe('instagram');
+  });
+  it('settings from the API are cleaned: shapes, sizes and colours', () => {
+    const s = mergeSettings({ industries: ['  Roofing ', 'Roofing', '', 5 as any], stages: [{ id: 'x', label: 'X', color: 'red;background:url(x)' }, { nope: 1 } as any], senders: [{ id: 's', platform: 'linkedin', name: 'Me', day_connect: -5 }, 'bad' as any], fields: [{ id: 'f', label: 'F', type: 'weird' as any }], actions: [{ id: 'a', label: 'A', kind: 'evil' as any }] } as any);
+    expect(s.industries).toEqual(['Roofing', '5']);
+    expect(s.stages).toEqual([{ id: 'x', label: 'X', color: undefined }]);
+    expect(s.senders).toEqual([{ id: 's', platform: 'linkedin', name: 'Me', day_connect: 0, week_connect: 0, day_msg: 0 }]);
+    expect(s.fields[0].type).toBe('text'); expect(s.actions[0].kind).toBe('touch');
+  });
+});

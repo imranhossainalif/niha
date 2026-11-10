@@ -78,7 +78,7 @@ export function SettingsTab({ c, onSaved }: { c: Ctx; onSaved: (s: Settings) => 
         </div>
       </section>
 
-      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))' }}>
+      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(240px, 100%), 1fr))' }}>
         <section className="sm-card"><Lines label="Industry / business type" value={s.industries} onChange={(v) => set({ industries: v })} /></section>
         <section className="sm-card"><Lines label="Business size" value={s.sizes} onChange={(v) => set({ sizes: v })} /></section>
         <section className="sm-card"><Lines label="Role" value={s.roles} onChange={(v) => set({ roles: v })} /></section>
@@ -89,7 +89,7 @@ export function SettingsTab({ c, onSaved }: { c: Ctx; onSaved: (s: Settings) => 
 
       <Opts<PlatformOpt> title="Platform" hint="Add any platform (Threads, Pinterest, Upwork…). Reword ‘request’ and ‘accepted’ to fit each platform." list={s.platforms} onChange={(l) => set({ platforms: l.map((x) => ({ ...x, connect: x.connect || 'Follow', back: x.back || 'Follow back' })) })}
         extra={(o, up) => <><input className="sm-input" style={{ width: 190 }} placeholder="Request wording" value={o.connect || ''} onChange={(e) => up({ connect: e.target.value })} /><input className="sm-input" style={{ width: 170 }} placeholder="Accepted wording" value={o.back || ''} onChange={(e) => up({ back: e.target.value })} /></>} />
-      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))' }}>
+      <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px, 100%), 1fr))' }}>
         <Opts title="Relationship stages" list={s.stages} onChange={(l) => set({ stages: l })} />
         <Opts title="Reply statuses" list={s.reply_statuses} onChange={(l) => set({ reply_statuses: l })} />
         <Opts title="Sales stages" list={s.sales_stages} onChange={(l) => set({ sales_stages: l })} />

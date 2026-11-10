@@ -110,7 +110,7 @@ export function ProspectView({ c, id, onClose, onChanged, onDeleted }: { c: Ctx;
   if (!d) return null;
   const set = (patch: Partial<Prospect>) => { setD({ ...d, ...patch }); setDirty(true); };
   const save = async (patch?: Partial<Prospect>) => {
-    try { const r = await api<{ prospect: Prospect }>('/api/outreach/prospects/' + id, { method: 'PATCH', json: patch || { ...d, profiles: d.profiles.filter((x) => x.url.trim() || x.out || x.back || x.msgs) } }); setDirty(false); setD(r.prospect); onChanged(r.prospect); toast('Saved'); }
+    try { const r = await api<{ prospect: Prospect }>('/api/outreach/prospects/' + id, { method: 'PATCH', json: patch ? { ...patch, version: d.version } : { ...d, version: d.version, profiles: d.profiles.filter((x) => x.url.trim() || x.out || x.back || x.msgs) } }); setDirty(false); setD(r.prospect); onChanged(r.prospect); toast('Saved'); }
     catch (e: any) { toast(e.message, 'err'); }
   };
   const log = async (type: string, platform?: string, extra: Record<string, string> = {}) => {
@@ -142,7 +142,7 @@ export function ProspectView({ c, id, onClose, onChanged, onDeleted }: { c: Ctx;
             <label className="row xs muted" style={{ gap: 4 }}>Date<input type="date" className="sm-input" style={{ width: 150 }} max={c.today} value={when} onChange={(e) => setWhen(e.target.value)} /></label>
           </div>
           {tplText && <div className="sm-card flat" style={{ padding: 10 }}><div className="row"><b className="sm-t grow">Template text</b><button className="sm-btn sm" onClick={() => { navigator.clipboard?.writeText(tplText.replace(/\{name\}/gi, d.name.split(' ')[0]).replace(/\{company\}/gi, d.company || '').replace(/\{city\}/gi, d.city || '')); toast('Copied'); }}>Copy for {d.name.split(' ')[0]}</button></div><div className="sm-t" style={{ whiteSpace: 'pre-wrap' }}>{tplText}</div></div>}
-          <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+          <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(280px, 100%), 1fr))' }}>
             {d.profiles.map((x, i) => { const P = pf(s, x.platform); const mine = s.senders.filter((z) => z.platform === x.platform); return (
               <div key={i} className="or-prof">
                 <div className="row"><Pf s={s} id={x.platform} href={x.url} /><span className="muted xs grow" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{x.url || 'no link'}</span></div>

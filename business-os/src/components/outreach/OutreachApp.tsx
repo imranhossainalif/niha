@@ -53,8 +53,11 @@ function App() {
 
   const put = (p: Prospect) => setData((d) => (d ? { ...d, prospects: d.prospects.some((x) => x.id === p.id) ? d.prospects.map((x) => (x.id === p.id ? p : x)) : [p, ...d.prospects] } : d));
   const log = async (p: Prospect, type: string, platform?: string, extra: LogExtra = {}) => {
+    // the account chosen last time on this platform is remembered, so one-click buttons (Today tab) are counted against it too
+    let remembered: string | undefined;
+    try { remembered = platform ? (JSON.parse(localStorage.getItem('bos_or_sender') || '{}') as Record<string, string>)[platform] : undefined; } catch { /* private mode */ }
     try {
-      const r = await api<{ prospect: Prospect; activity: Activity }>('/api/outreach/log', { method: 'POST', json: { prospect: p.id, type, platform, ...extra } });
+      const r = await api<{ prospect: Prospect; activity: Activity }>('/api/outreach/log', { method: 'POST', json: { prospect: p.id, type, platform, ...(remembered ? { sender: remembered } : {}), ...extra } });
       setData((d) => (d ? { ...d, prospects: d.prospects.map((x) => (x.id === r.prospect.id ? r.prospect : x)), activities: [...d.activities, r.activity] } : d));
       toast(p.name + ': ' + actionLabel(type, data.settings) + (r.activity.step ? ' (Msg ' + r.activity.step + ')' : '') + ' — logged');
       return r.prospect;
@@ -70,7 +73,7 @@ function App() {
   const waiting = data.prospects.filter((p) => p.awaiting).length;
 
   return (
-    <div ref={root} className="sm">
+    <div ref={root} className="sm or-root">
       <header className="sm-card sm-head" style={{ padding: '14px 16px' }}>
         <div className="stack" style={{ gap: 2 }}><h1>Outreach</h1><span className="muted xs">{data.prospects.length} prospect{data.prospects.length === 1 ? '' : 's'} · {waiting} waiting for our reply · who we reached, where, what came back and what to do next</span></div>
         <span className="grow" />

@@ -46,7 +46,7 @@ const OUTREACH_JS = String.raw`/* Business OS: sidebar → Outreach = the native
 function outreachView() {
   const B = window.__bosOutreach || (window.__bosOutreach = (() => {
     const host = document.createElement('div');
-    host.style.cssText = 'position:absolute;z-index:1;display:none';
+    host.style.cssText = 'position:absolute;z-index:1;display:none;scroll-margin-top:110px'; // stay clear of the sticky top bar
     const f = document.createElement('iframe');
     f.title = 'Outreach'; f.style.cssText = 'width:100%;height:700px;border:0;display:block;background:transparent';
     host.appendChild(f); document.body.appendChild(host);

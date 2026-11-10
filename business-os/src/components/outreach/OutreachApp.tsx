@@ -13,7 +13,7 @@ import { AddProspect, ImportBox, ProspectView } from './ProspectModal';
 import { SettingsTab } from './SettingsTab';
 
 type Tab = 'dash' | 'queue' | 'list' | 'pipe' | 'report' | 'settings';
-const TABS: [Tab, string, string][] = [['dash', 'Dashboard', 'chart'], ['queue', 'Aajker kaj', 'check'], ['list', 'Prospect', 'users'], ['pipe', 'Pipeline', 'list'], ['report', 'Report', 'chart'], ['settings', 'Settings', 'spark']];
+const TABS: [Tab, string, string][] = [['dash', 'Dashboard', 'chart'], ['queue', 'Today', 'check'], ['list', 'Prospects', 'users'], ['pipe', 'Pipeline', 'list'], ['report', 'Reports', 'chart'], ['settings', 'Settings', 'spark']];
 
 export function OutreachApp({ embed }: { embed?: boolean }) {
   const [mounted, setMounted] = useState(false);
@@ -48,37 +48,42 @@ function App() {
     return () => ro.disconnect();
   }, [data]);
 
-  if (err) return <div className="sm"><div className="sm-card">Outreach load hoyni: {err} <button className="sm-btn sm" onClick={load}>Abar chesta</button></div></div>;
-  if (!data) return <div className="sm"><div className="sm-card muted">Load hocche…</div></div>;
+  if (err) return <div className="sm"><div className="sm-card">Outreach could not load: {err} <button className="sm-btn sm" onClick={load}>Try again</button></div></div>;
+  if (!data) return <div className="sm"><div className="sm-card muted">Loading…</div></div>;
 
   const put = (p: Prospect) => setData((d) => (d ? { ...d, prospects: d.prospects.some((x) => x.id === p.id) ? d.prospects.map((x) => (x.id === p.id ? p : x)) : [p, ...d.prospects] } : d));
   const log = async (p: Prospect, type: string, platform?: string, extra: LogExtra = {}) => {
     try {
       const r = await api<{ prospect: Prospect; activity: Activity }>('/api/outreach/log', { method: 'POST', json: { prospect: p.id, type, platform, ...extra } });
       setData((d) => (d ? { ...d, prospects: d.prospects.map((x) => (x.id === r.prospect.id ? r.prospect : x)), activities: [...d.activities, r.activity] } : d));
-      toast(p.name + ': ' + actionLabel(type, data.settings) + (r.activity.step ? ' (Msg ' + r.activity.step + ')' : '') + ' log hoyeche');
+      toast(p.name + ': ' + actionLabel(type, data.settings) + (r.activity.step ? ' (Msg ' + r.activity.step + ')' : '') + ' — logged');
       return r.prospect;
     } catch (e: any) { toast(e.message, 'err'); return null; }
   };
   const move = async (p: Prospect, patch: Partial<Prospect>) => { try { const r = await api<{ prospect: Prospect }>('/api/outreach/prospects/' + p.id, { method: 'PATCH', json: patch }); put(r.prospect); } catch (e: any) { toast(e.message, 'err'); } };
+  const bulk = async (ids: string[], patch: Partial<Prospect>) => {
+    let ok = 0;
+    for (const id of ids) { const cur = data.prospects.find((x) => x.id === id); if (!cur) continue; const body = patch.tags ? { tags: [...new Set([...(cur.tags || []), ...patch.tags])] } : patch; try { const r = await api<{ prospect: Prospect }>('/api/outreach/prospects/' + id, { method: 'PATCH', json: body }); put(r.prospect); ok++; } catch { /* counted below */ } }
+    toast(ok + ' updated' + (ok < ids.length ? ' · ' + (ids.length - ok) + ' failed' : ''), ok < ids.length ? 'err' : 'ok');
+  };
   const c: Ctx = { ...data, log, open: (p) => setOpenId(p.id || null), reload: load };
   const waiting = data.prospects.filter((p) => p.awaiting).length;
 
   return (
     <div ref={root} className="sm">
       <header className="sm-card sm-head" style={{ padding: '14px 16px' }}>
-        <div className="stack" style={{ gap: 2 }}><h1>Outreach</h1><span className="muted xs">{data.prospects.length} prospect · {waiting} jon er uttor baki · kake kobe kothay reach kora hoyeche, reply ar stage</span></div>
+        <div className="stack" style={{ gap: 2 }}><h1>Outreach</h1><span className="muted xs">{data.prospects.length} prospect{data.prospects.length === 1 ? '' : 's'} · {waiting} waiting for our reply · who we reached, where, what came back and what to do next</span></div>
         <span className="grow" />
         <button className="sm-btn" onClick={() => setImporting(true)}>Import</button>
-        <button className="sm-btn primary" onClick={() => setAdding(true)} style={{ height: 40, padding: '0 18px', fontSize: 14.5 }}><Icon name="plus" />Prospect add</button>
+        <button className="sm-btn primary" onClick={() => setAdding(true)} style={{ height: 40, padding: '0 18px', fontSize: 14.5 }}><Icon name="plus" />Add prospect</button>
       </header>
       <nav className="sm-seg" role="tablist" style={{ justifySelf: 'start' }}>
         {TABS.map(([k, l, ic]) => <button key={k} type="button" role="tab" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}><Icon name={ic} size={15} />{l}{k === 'queue' && waiting ? <span className="sm-badge" style={{ marginLeft: 4, background: 'var(--bad)', color: '#fff' }}>{waiting}</span> : null}</button>)}
       </nav>
       <div key={tab} className="sm-fade">
-        {tab === 'dash' && <Dashboard c={c} />}
+        {tab === 'dash' && <Dashboard c={c} goto={(t, flt) => { if (flt) setF(flt); setTab(t); }} />}
         {tab === 'queue' && <Queue c={c} />}
-        {tab === 'list' && <Prospects c={c} f={f} setF={setF} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} />}
+        {tab === 'list' && <Prospects c={c} f={f} setF={setF} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} bulk={bulk} />}
         {tab === 'pipe' && <Pipeline c={c} f={f} setF={setF} move={move} />}
         {tab === 'report' && <Report c={c} f={f} setF={setF} />}
         {tab === 'settings' && <SettingsTab c={c} onSaved={(s: Settings) => setData((d) => (d ? { ...d, settings: s } : d))} />}

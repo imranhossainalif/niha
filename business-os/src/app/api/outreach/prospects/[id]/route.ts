@@ -5,7 +5,7 @@ import { cleanProspect, type Activity, type Prospect } from '@/lib/outreach/core
 import { allProspects, findDup, loadSettings, needOutreach } from '@/lib/outreach/server';
 
 type Ctx = { params: Promise<{ id: string }> };
-const nf = () => Object.assign(new Error('Prospect pawa jayni'), { status: 404, code: 'not_found' });
+const nf = () => Object.assign(new Error('Prospect not found'), { status: 404, code: 'not_found' });
 
 /** One prospect with its full timeline. */
 export const GET = handle(async (req: Request, { params }: Ctx) => {
@@ -31,7 +31,7 @@ export const PATCH = handle(async (req: Request, { params }: Ctx) => {
   const next = { ...(s.data as Prospect), ...c };
   if (c.profiles || c.email || c.phone) {
     const dup = b.force ? undefined : findDup(await allProspects(p), next, id);
-    if (dup) return json({ error: { code: 'duplicate', message: 'Ei link/email onno prospect e ache: ' + dup.name }, duplicate: dup }, 409);
+    if (dup) return json({ error: { code: 'duplicate', message: 'Another prospect already has this link/email: ' + dup.name }, duplicate: dup }, 409);
   }
   const saved = await ref.set(JSON.parse(JSON.stringify(next)));
   return json({ prospect: { ...next, id, version: saved.version } });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { applyActivity, cleanProspect, DEFAULT_SETTINGS as S, dupKeys, groupBy, mergeSettings, normUrl, parseCsv, platformOf, queues, rowToProspect, senderUsage, stats, type Activity, type Prospect } from '@/lib/outreach/core';
+import { applyActivity, cleanProspect, DEFAULT_SETTINGS as S, dupKeys, groupBy, mergeSettings, rebuild, normUrl, parseCsv, platformOf, queues, rowToProspect, senderUsage, stats, type Activity, type Prospect } from '@/lib/outreach/core';
 
 const P = (o: Partial<Prospect> = {}): Prospect => ({ id: 'p1', business: 'lrf', name: 'John', profiles: [{ platform: 'linkedin', url: 'https://www.linkedin.com/in/john/' }, { platform: 'instagram', url: 'instagram.com/john' }], stage: 'cold', created_at: '2026-11-01T05:00:00.000Z', ...o });
 const A = (type: string, platform: string | undefined, at: string, o: Partial<Activity> = {}): Activity => ({ business: 'lrf', prospect: 'p1', type, platform, at, day: at.slice(0, 10), by: 'niha@x.com', ...o });
@@ -119,5 +119,22 @@ describe('outreach: input', () => {
   it('settings: saved lists win, broken core lists fall back', () => {
     const s = mergeSettings({ industries: ['Roofing'], stages: [], followup_days: 0 } as any);
     expect(s.industries).toEqual(['Roofing']); expect(s.stages.length).toBeGreaterThan(5); expect(s.followup_days).toBe(3);
+  });
+});
+
+describe('outreach: undo and templates', () => {
+  it('rebuild recalculates counters from the remaining log and keeps the hand-set stage', () => {
+    const acts = [A('connect', 'instagram', '2026-11-10T04:00:00.000Z'), A('msg', 'instagram', '2026-11-11T05:00:00.000Z'), A('msg', 'instagram', '2026-11-12T05:00:00.000Z')];
+    const { p } = run(P(), acts);
+    const back = rebuild({ ...p, stage: 'warm' }, acts.slice(0, 2), S);
+    const ig = back.profiles.find((x) => x.platform === 'instagram')!;
+    expect(ig.msgs).toBe(1); expect(back.touches).toBe(2); expect(back.stage).toBe('warm'); expect(back.reply_status).toBe('none');
+    expect(rebuild(p, [], S)).toMatchObject({ touches: 0, awaiting: false });
+  });
+  it('a reply is credited to the template of the last message on that profile', () => {
+    const { p, acts } = run(P(), [A('msg', 'linkedin', '2026-11-10T04:00:00.000Z', { template: 't1' }), A('reply', 'linkedin', '2026-11-11T04:00:00.000Z', { sentiment: 'not_now' })]);
+    expect(acts[1].template).toBe('t1');
+    const st = stats([p], acts, '2026-11-10', '2026-11-11', S);
+    expect(st.templates.t1).toEqual({ sent: 1, replies: 1 }); expect(st.sentiments).toEqual({ not_now: 1 }); expect(st.repliedPeople).toBe(1);
   });
 });

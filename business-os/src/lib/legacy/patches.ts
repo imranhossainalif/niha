@@ -72,7 +72,7 @@ function outreachView() {
   return [B.ph];
 }
 VIEWS.outreach = outreachView;
-TITLES.outreach = ['Outreach', 'Social media outreach: kake kobe kothay reach kora hoyeche, reply, stage, follow-up'];
+TITLES.outreach = ['Outreach', 'Social media outreach: who was reached where, replies, stage and follow-ups'];
 `;
 
 export type Patch = { name: string; find: string; replace: string };

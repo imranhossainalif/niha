@@ -8,6 +8,6 @@ export const POST = handle(async (req: Request) => {
   needOutreach(p, true);
   const b = await req.json();
   const r = await createProspect(p, b, await loadSettings(p), await allProspects(p), !!b.force);
-  if (r.duplicate) return json({ error: { code: 'duplicate', message: 'Ei prospect age thekei ache: ' + r.duplicate.name }, duplicate: r.duplicate }, 409);
+  if (r.duplicate) return json({ error: { code: 'duplicate', message: 'This prospect already exists: ' + r.duplicate.name }, duplicate: r.duplicate }, 409);
   return json({ prospect: r.prospect }, 201);
 });

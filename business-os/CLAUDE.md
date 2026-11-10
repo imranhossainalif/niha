@@ -73,11 +73,12 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   `.sm` styles) in its own permanent frame (`OUTREACH_JS` in `patches.ts`). Manual-assisted social outreach tracking — it never sends
   anything. Logic is pure and tested in `src/lib/outreach/core.ts`: a prospect has several `profiles` (platform, link, request sent /
   accepted-follow back, message count, reply); every button is one row in `outreach_activities` and `applyActivity` moves the prospect
-  (Msg 1/2/3 numbering, stage only upward, "uttor baki"); `stats` (dashboard per platform/step/rep), `queues` (Aajker kaj), `groupBy`
+  (Msg 1/2/3 numbering, stage only upward, "reply waiting"); `stats` (dashboard per platform/step/template/rep), `queues` (Today), `rebuild` (undo), `groupBy`
   (report by city/country/industry/size/role/…), `senderUsage` (our accounts' daily limits), duplicate check by normalised link.
   Everything the team picks from (platforms, industries, stages, custom fields, custom action buttons, templates, our accounts, targets)
   lives in `outreach_settings/main` and is edited in its Settings tab. All docs carry `business: 'lrf'` (the access bucket), the brand a
-  prospect is for is the `brand` field. Routes `/api/outreach/*`. The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
+  prospect is for is the `brand` field. Routes `/api/outreach/*`. **This tab is in English** (owner request) — the rest of the dashboard stays Banglish.
+  Charts are inline SVG (`Charts.tsx`). The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
 - **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
   the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,
   BM25 lookup) and the most similar past customer→TEAM reply pairs (`learn.ts`, built from `inbox_messages`, phones scrubbed, 15 min cache).

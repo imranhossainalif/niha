@@ -1,0 +1,12 @@
+{
+ "business": "localservicehq",
+ "title": "Claimed contractor listings",
+ "metric": "Listings",
+ "target": 50,
+ "current": 0,
+ "unit": "listings",
+ "due": "2027-01-31",
+ "status": "active",
+ "horizon": "Q1",
+ "note": "Directory claim rate"
+}

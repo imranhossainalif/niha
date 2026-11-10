@@ -1,0 +1,16 @@
+{
+ "business": "localservicehq",
+ "name": "Summit Concrete Works",
+ "contact": "Mike R.",
+ "niche": "Concrete",
+ "city": "Austin, TX",
+ "service": "Website",
+ "package": "Verified Pro",
+ "monthly_fee": 99,
+ "setup_fee": 99,
+ "start_date": "2026-11-01",
+ "next_payment": "2026-12-01",
+ "contract_months": 6,
+ "status": "onboarding",
+ "note": "Directory profile + lead routing"
+}

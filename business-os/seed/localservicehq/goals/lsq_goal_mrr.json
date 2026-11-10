@@ -1,0 +1,12 @@
+{
+ "business": "localservicehq",
+ "title": "MRR from pro listings",
+ "metric": "MRR",
+ "target": 3000,
+ "current": 0,
+ "unit": "$",
+ "due": "2027-01-31",
+ "status": "active",
+ "horizon": "Q1",
+ "note": "Verified Pro + Featured Pro subscriptions"
+}

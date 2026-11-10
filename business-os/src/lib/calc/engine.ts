@@ -16,7 +16,9 @@ export function engNums(S: State, id: string, today: string) {
     deliv: sm(rows, 'delivered'), rev: sm(rows, 'delivered_amount'), sent: sm(rows, 'sent'), ret: sm(rows, 'sent_returned'), days: rows.length,
   });
   const c = n(cur), p = n(prev);
-  const calls = (S.calls_daily ?? []).filter((r) => daysTo(r.date, today) > -31 && daysTo(r.date, today) <= 0);
+  // calls_daily is a Kids Care-only collection (the sales team sells Kids Care),
+  // so other businesses must not show Kids Care's call numbers.
+  const calls = id === 'kidscare' ? (S.calls_daily ?? []).filter((r) => daysTo(r.date, today) > -31 && daysTo(r.date, today) <= 0) : [];
   const cl = { calls: sumBy(calls, (r) => r.calls), rcv: sumBy(calls, (r) => r.received), ord: sumBy(calls, (r) => r.orders) };
   return { c, p, cl, aov: c.deliv ? c.rev / c.deliv : 0, paov: p.deliv ? p.rev / p.deliv : 0 };
 }

@@ -11,7 +11,9 @@ let cached: { mtime: number; html: string } | null = null;
 /** The full legacy dashboard (every tab), running against this server through /legacy/bos-shim.js. */
 export async function GET(req: Request) {
   const p = await requestPrincipal(req);
-  if (!p) return Response.redirect(new URL('/login?next=/app', req.url), 302);
+  // Relative Location on purpose: behind the Caddy proxy `req.url` is built from PORT/hostname
+  // (https://localhost:3000), so an absolute redirect sent the browser to the server's own localhost.
+  if (!p) return new Response(null, { status: 302, headers: { location: '/login?next=/app' } });
   const file = path.join(process.cwd(), 'legacy', 'business-os.html');
   const st = await fs.stat(file);
   if (!cached || cached.mtime !== st.mtimeMs) cached = { mtime: st.mtimeMs, html: legacyDocument(await fs.readFile(file, 'utf8')) };

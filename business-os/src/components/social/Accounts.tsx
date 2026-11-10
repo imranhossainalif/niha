@@ -1,17 +1,20 @@
 'use client';
-// Connect accounts: Facebook + Instagram (through the Meta system-user token), YouTube (Google login),
-// TikTok (TikTok login). Each platform card shows what is connected and the exact one-time setup.
+// Connect accounts: Facebook + Instagram (one-click Facebook login, or the Meta system-user token),
+// YouTube (Google login), TikTok (TikTok login), Pinterest and LinkedIn (their own logins).
+// Each card shows what is connected and the one-time setup.
 import { useEffect, useState, type ReactNode } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, compact, Modal, useToast, type Account } from './ui';
 
 type Found = { network: 'facebook' | 'instagram'; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
-type Prov = { meta: boolean; youtube: boolean; tiktok: boolean };
+type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean; pinterest: boolean; linkedin: boolean };
 const DESC: Record<Net, string> = {
   facebook: 'Page e post (chobi, album, video, link) · reach, react, comment, share',
   instagram: 'Chobi, Reel, Carousel · reach, like, save · competitor research',
   youtube: 'Video / Shorts upload · view, like, comment, subscriber',
   tiktok: 'Video post ba TikTok app e draft · view, like, comment, share',
+  pinterest: 'Chobi pin board e · impression, save, click',
+  linkedin: 'Nijer profile e text post (company Page na) · token ~60 din',
 };
 
 export function Accounts({ business, accounts, canAdmin, onChange }: { business: string; accounts: Account[]; canAdmin: boolean; onChange: () => void }) {
@@ -37,7 +40,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
     catch (e) { toast((e as Error).message, 'err'); }
     setBusy('');
   };
-  const oauth = (p: 'youtube' | 'tiktok') => {
+  const oauth = (p: 'youtube' | 'tiktok' | 'meta' | 'pinterest' | 'linkedin') => {
     const w = window.open(`/api/social/oauth/${p}/start?business=${business}`, 'bos-oauth', 'width=540,height=760');
     if (!w) toast('Popup bondho — browser e popup allow korun', 'err');
   };
@@ -65,28 +68,42 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
   };
 
   const metaBtn = <button className="sm-btn primary" onClick={discover} disabled={busy === 'meta' || prov?.meta === false}>{busy === 'meta' ? <span className="sm-spin" /> : <Icon name="search" size={14} />}Page / Instagram khujun</button>;
+  const metaDiscoverGhost = <button className="sm-btn" onClick={discover} disabled={busy === 'meta'}>{busy === 'meta' ? <span className="sm-spin" /> : <Icon name="search" size={14} />}Aro Page khujun</button>;
+  const metaConnectBtn = <button className="sm-btn primary" onClick={() => oauth('meta')}><NetLogo net="facebook" size={16} />Facebook diye connect</button>;
+  const fbAction = prov?.metaApp
+    ? <div className="row" style={{ flexWrap: 'wrap' }}>{metaConnectBtn}{prov.meta && metaDiscoverGhost}</div>
+    : prov?.meta === false
+      ? <span className="sm-warn"><Icon name="alert" />Age Settings e Meta App ID boshan (nicher guide) — tarpor ek click ei connect hobe.</span>
+      : metaBtn;
+  const igAction = prov?.metaApp ? metaConnectBtn : prov?.meta === false
+    ? <span className="muted xs">Facebook er sathe eki connect — Facebook card theke connect korun.</span>
+    : metaBtn;
   const ytBtn = prov?.youtube ? <button className="sm-btn primary" onClick={() => oauth('youtube')}><NetLogo net="youtube" size={16} />Google diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "YouTube setup" korun (Google client ID lagbe).</span>;
   const ttBtn = prov?.tiktok ? <button className="sm-btn primary" onClick={() => oauth('tiktok')}><NetLogo net="tiktok" size={16} />TikTok diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "TikTok setup" korun (TikTok client key lagbe).</span>;
+  const pinBtn = prov?.pinterest ? <button className="sm-btn primary" onClick={() => oauth('pinterest')}><NetLogo net="pinterest" size={16} />Pinterest diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "Pinterest setup" korun (Pinterest App ID lagbe).</span>;
+  const liBtn = prov?.linkedin ? <button className="sm-btn primary" onClick={() => oauth('linkedin')}><NetLogo net="linkedin" size={16} />LinkedIn diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "LinkedIn setup" korun (LinkedIn Client ID lagbe).</span>;
 
   return (
     <div className="stack" style={{ gap: 14 }}>
       <div className="sm-grid sm-g2">
-        {card('facebook', prov?.meta === false ? <span className="sm-warn"><Icon name="alert" />Age Settings e Meta "Social media token" boshan (nicher guide).</span> : metaBtn)}
-        {card('instagram', prov?.meta === false ? <span className="muted xs">Facebook er sathe eki token — Facebook Page er sathe link kora Instagram e ashe.</span> : metaBtn)}
+        {card('facebook', fbAction)}
+        {card('instagram', igAction)}
         {card('youtube', ytBtn)}
         {card('tiktok', ttBtn)}
+        {card('pinterest', pinBtn)}
+        {card('linkedin', liBtn)}
       </div>
 
       <section className="sm-card stack">
         <h2>Ekbar setup: ki ki korte hobe</h2>
         <span className="muted sm-t">Protita platform er nijer app/permission lage. Ekbar korle bar bar lagbe na.</span>
-        <Guide net="facebook" title="Facebook + Instagram setup">
+        <Guide net="facebook" title="Facebook + Instagram setup (one-click)">
           <li><b>Instagram ke professional account banan:</b> Instagram app → Settings → <i>Account type and tools</i> → <i>Switch to professional account</i> → Business.</li>
-          <li><b>Instagram ke Page er sathe link:</b> Facebook e Kids Care BD Page → Settings → <i>Linked accounts</i> → Instagram → Connect.</li>
-          <li><b>Meta app e permission:</b> <a className="lnk" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">developers.facebook.com/apps</a> → apnar app → <i>Use cases</i> → Add → "Manage everything on your Page" ar "Manage messaging &amp; content on Instagram".</li>
-          <li><b>System user ke access:</b> <a className="lnk" href="https://business.facebook.com/settings/system-users" target="_blank" rel="noreferrer">Business settings → System users</a> → <i>business-os</i> → <i>Assign assets</i> → Pages → Kids Care BD → Full control; Instagram accounts → Kids Care → Full control.</li>
-          <li><b>Token:</b> oi system user e <i>Generate new token</i> → tick: <code>pages_manage_posts</code> <code>pages_read_engagement</code> <code>read_insights</code> <code>instagram_basic</code> <code>instagram_content_publish</code> <code>instagram_manage_insights</code> <code>pages_show_list</code> <code>business_management</code> <code>ads_read</code> → Generate → copy.</li>
-          <li>Dashboard → <b>Settings</b> → Meta card → "Key bosan" → <i>Social media token</i> e paste → Save. Tarpor upore <b>"Page / Instagram khujun"</b>.</li>
+          <li><b>Instagram ke Page er sathe link:</b> Facebook e Kids Care BD Page → Settings → <i>Linked accounts</i> → Instagram → Connect. (Ei duita Meta er niyom — app diyeo lage.)</li>
+          <li><b>Settings e Meta App ID boshan:</b> Dashboard → Settings → <i>Meta (InboxPilot)</i> → <i>Meta App ID</i> — ID ta <a className="lnk" href="https://developers.facebook.com/apps/" target="_blank" rel="noreferrer">developers.facebook.com/apps</a> → apnar app → <i>Settings → Basic</i> e paben. <i>App secret</i> o eki jaygay — jodi InboxPilot er jonno age theke bosano thake, ar lagbe na.</li>
+          <li><b>Meta app e Facebook Login chalu:</b> oi app → <i>Add product</i> → <i>Facebook Login</i> → <i>Settings</i> → <i>Valid OAuth Redirect URIs</i> e eta din: <CopyCode text={cb + 'meta/callback'} /> → Save.</li>
+          <li><b>Bas, ek click:</b> upore <b>"Facebook diye connect"</b> → Facebook login → Page bachai → Allow. Page ar link-kora Instagram nijei connect hoye jabe — kono token copy/paste nai.</li>
+          <li><b>Jene rakhun:</b> login token ~60 din thake; meyad shesh hole abar ek click e connect korlei hobe. Purono system-user token er upay o ache — Settings e <i>Social media token</i> boshaile setai age use hobe.</li>
         </Guide>
         <Guide net="youtube" title="YouTube setup (Google)">
           <li><a className="lnk" href="https://console.cloud.google.com/projectcreate" target="_blank" rel="noreferrer">console.cloud.google.com</a> e notun project: naam <i>EasyFounder</i>.</li>
@@ -105,6 +122,20 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
           <li>Ekhoni test korte: <b>Sandbox</b> → Create → <i>Target users</i> e Kids Care er TikTok add → sandbox er client key/secret nin. Live er jonno <b>Submit for review</b> (likhun: "Our own company account: scheduling and analytics") — 3-10 din lage.</li>
           <li><b>Client key</b> ar <b>Client secret</b> → Dashboard → Settings → "YouTube + TikTok" → Save → upore <b>"TikTok diye connect"</b>.</li>
           <li><b>Jene rakhun:</b> TikTok review/audit er age "Shorasori post" kevol <i>Only me</i> hoy — tai default e "TikTok app e draft" deya: video TikTok app e notification hoye ashe, sound diye okhan theke post korben.</li>
+        </Guide>
+        <Guide net="pinterest" title="Pinterest setup">
+          <li><a className="lnk" href="https://developers.pinterest.com/" target="_blank" rel="noreferrer">developers.pinterest.com</a> e business er Pinterest account diye login → <i>My apps</i> → <b>Create app</b>: naam <i>EasyFounder</i>, website: <CopyCode text={cb.split('/api/')[0] || ''} /></li>
+          <li>App e <i>Redirect links</i> e eta din: <CopyCode text={cb + 'pinterest/callback'} /></li>
+          <li><b>App ID</b> ar <b>App secret</b> → Dashboard → Settings → <i>Pinterest</i> → Save → upore <b>"Pinterest diye connect"</b>.</li>
+          <li>Connect er shomoy account er shob board save hoy — post korar shomoy pin account er <b>prothom board</b> e jabe (Composer theke board bodlano jay). Pinterest e age theke board na thakle ekta baniye nin.</li>
+          <li><b>Jene rakhun:</b> notun app prothome <b>Trial access</b> e thake — tokhon pin shudhu ekta private sandbox board e jay, public e na. Public pin er jonno app er page theke <b>Standard access</b> er apply korun (Pinterest review kore, kichu din lage). Ekhon shudhu <b>chobi pin</b> supported — video pin pore asbe.</li>
+        </Guide>
+        <Guide net="linkedin" title="LinkedIn setup">
+          <li><a className="lnk" href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer">linkedin.com/developers</a> e <i>Create app</i>: naam <i>EasyFounder</i>, ekta LinkedIn Page er sathe associate korun (jemon Local Revenue Flow) — app verify korte hole Page er admin diye verify korun.</li>
+          <li>App er <i>Products</i> tab theke add korun: <b>Share on LinkedIn</b> ar <b>Sign In with LinkedIn using OpenID Connect</b>.</li>
+          <li>App er <i>Auth</i> tab e <i>Authorised redirect URLs</i> e eta din: <CopyCode text={cb + 'linkedin/callback'} /></li>
+          <li>Eki <i>Auth</i> tab er <b>Client ID</b> ar <b>Primary Client Secret</b> → Dashboard → Settings → <i>LinkedIn</i> → Save → upore <b>"LinkedIn diye connect"</b> → nijer LinkedIn diye login → Allow.</li>
+          <li><b>Jene rakhun:</b> post jabe apnar <b>nijer profile</b> e (company Page e post korte LinkedIn er alada approval lage — ekhane nai). Prothom phase e shudhu <b>text post</b> (link thakle lekhar sheshe jabe); chobi post ekhono na. Login token <b>~60 din</b> thake ar refresh hoy na — meyad shesh hole abar ek click e connect korlei hobe.</li>
         </Guide>
       </section>
 

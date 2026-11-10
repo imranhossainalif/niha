@@ -4,7 +4,7 @@
 <style>
 /* Layout: dark green sidebar (overview / business / global) → top bar (title, search, month, add) → sub-tabs → colored KPI tiles → dark chart card + side panels → tables. Mirrors the LifeOS money screen, for Imran's businesses. */
 :root{
-  --bg:#F2F5F4; --panel:#FFFFFF; --soft:#EAF0EE; --fg:#14211E; --muted:#5C6E69; --line:#D7E0DD;
+  --bg:#F2F5F4; --panel:#FFFFFF; --soft:#EAF0EE; --fg:#14211E; --text:#14211E; --muted:#5C6E69; --line:#D7E0DD;
   --side:#0F3D35; --side-fg:#E3F0EC; --side-mute:#8DB3A9; --side-act:#1B5A4E; --accent:#13896F;
   --t1:#1F6F8B; --t2:#13896F; --t3:#C4424F; --t4:#6A4FC4; --t5:#C9661C; --t6:#167B98; --tilefg:#FFFFFF;
   --dark:#16211F; --dark-fg:#E6EFEC; --dark-mute:#9FB4AE; --dark-line:rgba(255,255,255,.08);
@@ -12,11 +12,11 @@
   --display:"Bricolage Grotesque",ui-sans-serif,system-ui,sans-serif; --body:"Figtree",ui-sans-serif,system-ui,sans-serif; --mono:"JetBrains Mono",ui-monospace,monospace;
 }
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
-  --bg:#0D1412; --panel:#151F1C; --soft:#1C2925; --fg:#E3ECE9; --muted:#93A6A0; --line:#28372F;
+  --bg:#0D1412; --panel:#151F1C; --soft:#1C2925; --fg:#E3ECE9; --text:#E3ECE9; --muted:#93A6A0; --line:#28372F;
   --side:#0A2621; --side-fg:#E3F0EC; --side-mute:#7FA197; --side-act:#174A40; --accent:#34C08E;
   --dark:#0F1816; --dark-line:rgba(255,255,255,.07); --good:#34C08E; --warn:#E8973A; --bad:#EE6B73; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0D1412; --panel:#151F1C; --soft:#1C2925; --fg:#E3ECE9; --muted:#93A6A0; --line:#28372F;
+  --bg:#0D1412; --panel:#151F1C; --soft:#1C2925; --fg:#E3ECE9; --text:#E3ECE9; --muted:#93A6A0; --line:#28372F;
   --side:#0A2621; --side-fg:#E3F0EC; --side-mute:#7FA197; --side-act:#174A40; --accent:#34C08E;
   --dark:#0F1816; --dark-line:rgba(255,255,255,.07); --good:#34C08E; --warn:#E8973A; --bad:#EE6B73; color-scheme:dark}
 html,body{height:100%}
@@ -49,7 +49,11 @@ main{min-width:0;display:flex;flex-direction:column}
 .btn.danger{color:var(--bad)}
 .btn.sm{padding:4px 9px;font-size:12.5px}
 .btn:focus-visible,.nav:focus-visible,.tab:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
-.tabs{display:flex;gap:2px;overflow-x:auto}
+.tabs{display:flex;gap:2px;overflow-x:auto;scrollbar-width:thin;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y}
+.tabs::-webkit-scrollbar{height:6px}
+.tabs::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.side::-webkit-scrollbar{height:6px;width:6px}
+.side::-webkit-scrollbar-thumb{background:rgba(255,255,255,.25);border-radius:99px}
 .tab{font:inherit;font-size:13.5px;background:none;border:0;border-bottom:2px solid transparent;padding:8px 10px;color:var(--muted);cursor:pointer;white-space:nowrap}
 .tab[aria-selected="true"]{color:var(--fg);border-bottom-color:var(--accent);font-weight:600}
 .content{padding:16px 24px 40px;padding-right:max(24px,env(safe-area-inset-right,0px));display:grid;gap:14px;align-content:start}
@@ -133,7 +137,7 @@ tr.click:hover td{background:var(--soft)}
 .att:last-child{border-bottom:0}
 .att .dot{width:10px;height:10px;border-radius:50%}
 .ext-card{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-dialog{border:1px solid var(--line);border-radius:14px;padding:0;background:var(--panel);color:var(--fg);width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 40px)}
+dialog{border:1px solid var(--line);border-radius:14px;padding:0;background:var(--panel);color:var(--fg);width:min(520px,calc(100vw - 32px));max-height:calc(100vh - 40px);overflow-y:auto;overscroll-behavior:contain}
 dialog::backdrop{background:rgba(8,18,15,.55)}
 .dlg{display:grid;gap:12px;padding:18px}
 .dlg h2{margin:0;font-family:var(--display);font-weight:600;font-size:18px}
@@ -151,7 +155,7 @@ dialog::backdrop{background:rgba(8,18,15,.55)}
 .hl{background:color-mix(in srgb,var(--warn) 30%,transparent);border-radius:3px}
 @media (max-width:860px){
   .app{grid-template-columns:1fr}
-  .side{position:sticky;top:0;z-index:5;height:auto;flex-direction:row;overflow-x:auto;padding:8px;padding-left:max(8px,env(safe-area-inset-left,0px));gap:4px}
+  .side{position:sticky;top:0;z-index:5;height:auto;flex-direction:row;overflow-x:auto;-webkit-overflow-scrolling:touch;touch-action:pan-x pan-y;padding:8px;padding-left:max(8px,env(safe-area-inset-left,0px));gap:4px}
   .brand,.grp h3,.me{display:none}
   .grp{display:flex;gap:2px}
   .nav{white-space:nowrap;padding:7px 9px}
@@ -160,6 +164,7 @@ dialog::backdrop{background:rgba(8,18,15,.55)}
   .search{order:3;max-width:none;flex-basis:100%}
 }
 @media (max-width:860px){.ib-grid{grid-template-columns:1fr!important}}
+@media (min-width:861px){.top{position:sticky;top:0;z-index:6;box-shadow:0 8px 18px -14px rgba(10,30,25,.35)}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 @media (max-width:760px){.ib-shell{grid-template-columns:1fr!important}.ib-shell>nav{display:flex!important;flex-wrap:wrap;gap:4px}.ib-shell>nav>div{display:none}.ib-shell>nav>button{width:auto!important}}
 </style>

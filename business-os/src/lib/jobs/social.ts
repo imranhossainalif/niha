@@ -10,19 +10,21 @@ import { mediaFile } from '../social/media';
 import { getAccess } from '../social/oauth';
 import { channel, publishYouTube, youtubePosts, type YtOptions } from '../social/youtube';
 import { profile, publishTikTok, tiktokPosts, type TtOptions } from '../social/tiktok';
-import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, publishFacebook, publishInstagram, socialToken, type Fetch, type Network } from '../social/meta';
+import { pinBoards, pinProfile, pinterestPosts, publishPinterest, type PinBoard } from '../social/pinterest';
+import { liProfile, publishLinkedIn } from '../social/linkedin';
+import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, metaTokens, publishFacebook, publishInstagram, type Fetch, type Network, type PostStat } from '../social/meta';
 import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
 import { recordUsage } from '../aiUsage';
 
 export type Target = { account_id: string; network: Network; name?: string; text?: string; status?: 'pending' | 'published' | 'failed'; ext_post_id?: string; permalink?: string; error?: string; note?: string; at?: string };
-export type PostOptions = { yt_title?: string; yt_privacy?: YtOptions['privacy']; yt_kids?: boolean; tt_mode?: TtOptions['mode']; tt_privacy?: TtOptions['privacy'] };
+export type PostOptions = { yt_title?: string; yt_privacy?: YtOptions['privacy']; yt_kids?: boolean; tt_mode?: TtOptions['mode']; tt_privacy?: TtOptions['privacy']; pin_board?: string };
 export type SocialPost = {
   business: string; status: 'draft' | 'scheduled' | 'publishing' | 'published' | 'partial' | 'failed';
   text: string; media: { id: string; url: string; mime: string }[]; link?: string; labels?: string[]; content_type?: string;
   targets: Target[]; scheduled_at?: string | null; published_at?: string; created_by?: string; error?: string; options?: PostOptions;
 };
-export type SocialAccount = { business: string; network: Network; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; active?: boolean; uploads?: string; error?: string };
+export type SocialAccount = { business: string; network: Network; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; active?: boolean; uploads?: string; board_id?: string; boards?: PinBoard[]; error?: string };
 
 const accounts = async (business?: string) =>
   (await db().collection('social_accounts').limit(200).get()).map((s) => ({ id: s.id, ...(s.data as SocialAccount) })).filter((a) => a.active !== false && (!business || a.business === business));
@@ -36,29 +38,45 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
   if (post.status === 'publishing') throw Object.assign(new Error('Post ta ekhon publish hocche'), { status: 409, code: 'conflict' });
   // claim it (a second worker/click loses the version race)
   await ref.set({ ...post, status: 'publishing' }, { expectedVersion: snap.version });
-  const all = await accounts(post.business);
-  const user = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await socialToken() : '';
-  const accts = new Map(all.map((a) => [a.id, a]));
-  const targets: Target[] = [];
-  for (const t of post.targets) {
-    if (t.status === 'published') { targets.push(t); continue; }
-    const a = accts.get(t.account_id);
-    try {
-      if (!a) throw new Error('Account ta ar connect nai');
-      const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
-      const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
-        : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
-        : await publishVideo(a.network, a.id, post, input.text, f);
-      targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
-    } catch (e) {
-      targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString() });
+  try {
+    const all = await accounts(post.business);
+    // Candidate tokens, not one: each Facebook login covers different Pages, so a Page token is derived
+    // from whichever stored login can manage that Page (see metaTokens in lib/social/meta).
+    const user: string | string[] = all.some((a) => a.network === 'facebook' || a.network === 'instagram') && post.targets.some((t) => t.network === 'facebook' || t.network === 'instagram') ? await metaTokens() : '';
+    const accts = new Map(all.map((a) => [a.id, a]));
+    const targets: Target[] = [];
+    for (const t of post.targets) {
+      if (t.status === 'published') { targets.push(t); continue; }
+      const a = accts.get(t.account_id);
+      try {
+        if (!a) throw new Error('Account ta ar connect nai');
+        const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
+        const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
+          : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
+          : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
+          : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f)
+          : await publishVideo(a.network, a.id, post, input.text, f);
+        targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
+      } catch (e) {
+        targets.push({ ...t, status: 'failed', error: String((e as Error).message || e).slice(0, 400), at: new Date().toISOString() });
+      }
+      // Save progress after each target, so a crash before the final write
+      // does not re-post a target that already published on retry.
+      try { await ref.set({ ...post, targets: [...targets], status: 'publishing' } as unknown as Data); } catch { /* progress save is best-effort */ }
     }
+    const okN = targets.filter((t) => t.status === 'published').length;
+    const status: SocialPost['status'] = okN === targets.length ? 'published' : okN ? 'partial' : 'failed';
+    const cur = (await ref.get())!;
+    await ref.set({ ...(cur.data as SocialPost), targets, status, published_at: okN ? new Date().toISOString() : (cur.data as SocialPost).published_at, error: status === 'published' ? undefined : targets.filter((t) => t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ') } as unknown as Data);
+    return { status, targets };
+  } catch (e) {
+    // Never leave the post stuck in 'publishing': release the claim so it can be retried.
+    try {
+      const cur = await ref.get();
+      if (cur && (cur.data as SocialPost).status === 'publishing') await ref.set({ ...(cur.data as SocialPost), status: 'failed', error: String((e as Error).message || e).slice(0, 400) } as unknown as Data);
+    } catch { /* keep the original error */ }
+    throw e;
   }
-  const okN = targets.filter((t) => t.status === 'published').length;
-  const status: SocialPost['status'] = okN === targets.length ? 'published' : okN ? 'partial' : 'failed';
-  const cur = (await ref.get())!;
-  await ref.set({ ...(cur.data as SocialPost), targets, status, published_at: okN ? new Date().toISOString() : (cur.data as SocialPost).published_at, error: status === 'published' ? undefined : targets.filter((t) => t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ') } as unknown as Data);
-  return { status, targets };
 }
 
 /** YouTube / TikTok take one video file from our media store. */
@@ -90,17 +108,19 @@ export async function publishDue(f?: Fetch) {
 export async function socialSync(opts: { days?: number; f?: Fetch } = {}) {
   const list = await accounts();
   if (!list.length) return { skipped: 'kono social account connect kora nai' };
-  const user = list.some((a) => a.network === 'facebook' || a.network === 'instagram') ? await socialToken() : '';
+  const user: string | string[] = list.some((a) => a.network === 'facebook' || a.network === 'instagram') ? await metaTokens() : '';
   const since = new Date(Date.now() - (opts.days ?? 90) * 864e5).toISOString();
   const ins = db().collection('social_insights');
   const today = bdToday();
   const res: Record<string, unknown> = {};
   for (const a of list) {
     try {
-      let posts, n: number | null;
-      if (a.network === 'youtube' || a.network === 'tiktok') {
+      let posts: PostStat[], n: number | null;
+      if (a.network === 'youtube' || a.network === 'tiktok' || a.network === 'pinterest' || a.network === 'linkedin') {
         const token = await getAccess(a.network, a.id, opts.f);
         if (a.network === 'youtube') { const c = await channel(token, opts.f); n = c.followers; posts = c.uploads ? await youtubePosts(a.ext_id, c.uploads, since, token, opts.f) : []; }
+        else if (a.network === 'linkedin') { await liProfile(token, opts.f); n = null; posts = []; } // token check only: OIDC userinfo has no follower count, and reading posts back needs the restricted r_member_social scope
+        else if (a.network === 'pinterest') { const pr = await pinProfile(token, opts.f); n = pr.followers; const boards = await pinBoards(token, opts.f).catch(() => a.boards ?? []); posts = await pinterestPosts(a.ext_id, boards, since, token, opts.f); }
         else { n = (await profile(token, opts.f)).followers; posts = await tiktokPosts(a.ext_id, since, token, opts.f); }
       } else {
         posts = a.network === 'facebook' ? await facebookPosts(a.ext_id, since, user, opts.f) : await instagramPosts(a.ext_id, a.page_id, since, user, opts.f);

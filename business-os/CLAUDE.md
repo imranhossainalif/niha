@@ -3,6 +3,10 @@
 Self-hosted business OS for Imran Hossain Alif (Bangladesh), branded **EasyFounder** (logo files in `public/brand/`: `logo.png` green, `logo-white.png` for dark backgrounds, `mark*.png`, favicons). The original brief is `docs/ORIGINAL_BRIEF.md`
 (build order, product rules, integrations) — read it before large changes. Keep this file current when the architecture changes.
 
+**New AI session?** Read `docs/AI_HANDOFF.md` first (from the repo root: `business-os/docs/AI_HANDOFF.md`) — live access,
+deploy rules, known issues, sanitized fixtures — and `docs/ai-access-checklist.md` (how Imran hands over access without
+pasting secrets into chat).
+
 ## Non-negotiable product rules
 - Analysis text labels **FACT** (from data) vs **HYPOTHESIS** (inference). No guarantees on CPM, CTR or sales.
 - Kids Care is baby food: never health/cure/weight-gain claims; never invent prices or offers.
@@ -10,7 +14,7 @@ Self-hosted business OS for Imran Hossain Alif (Bangladesh), branded **EasyFound
 - Analytics collections hold aggregates only (no customer names/phones). Customer data lives only in `inbox_messages`
   (role-restricted) and goes only to Meta and Anthropic.
 - **Never remove an existing tab or option** when refactoring. UI language is Banglish; keep existing labels.
-- `data/` and `.env` never go into git (the GitHub repo is private, but secrets in history stay there).
+- `data/` and `.env` never go into git (repo visibility can change, but secrets in history stay there).
 
 ## Stack
 Next.js 15 (App Router, route handlers, server actions) · TypeScript · PostgreSQL 16 + Prisma 6 · Auth.js v5 credentials (JWT)
@@ -61,7 +65,9 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   Meta does not allow posting to Facebook groups by API: groups are suggestions only.
   YouTube (`src/lib/social/youtube.ts`, Google OAuth) and TikTok (`tiktok.ts`, TikTok OAuth, FILE_UPLOAD chunks, inbox draft or
   direct post) log in through `/api/social/oauth/[provider]/start|callback`; tokens via `saveSecret('oauth:<account>')` (encrypted,
-  never in docs), refreshed by `oauth.getAccess`. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
+  never in docs), refreshed by `oauth.getAccess`. Pinterest (`pinterest.ts`, image pins) and LinkedIn (`linkedin.ts`, OIDC sign-in +
+  Posts API) use the same routes; LinkedIn v1 posts TEXT only to the member's own profile (no company pages, no media upload) and
+  its ~60-day member token has no refresh token at this product tier — on expiry `getAccess` asks for a one-click reconnect. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
   `/legal/privacy` and `/legal/terms` exist because TikTok/Google ask for them.
 - **Outreach CRM (sidebar → Outreach, under Target & Goal):** native page `/outreach` (`src/components/outreach/*`, reuses the Social
   `.sm` styles) in its own permanent frame (`OUTREACH_JS` in `patches.ts`). Manual-assisted social outreach tracking — it never sends

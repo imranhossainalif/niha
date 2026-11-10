@@ -1,10 +1,10 @@
 // Inline SVG icons: the four network logos (simplified) and the few UI icons the Social screens use.
 import type { CSSProperties } from 'react';
 
-export type Net = 'facebook' | 'instagram' | 'youtube' | 'tiktok';
-export const NETS: Net[] = ['facebook', 'instagram', 'youtube', 'tiktok'];
-export const NET_NAME: Record<Net, string> = { facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', tiktok: 'TikTok' };
-export const NET_COLOR: Record<Net, string> = { facebook: '#1877F2', instagram: '#D6249F', youtube: '#FF0000', tiktok: '#111111' };
+export type Net = 'facebook' | 'instagram' | 'youtube' | 'tiktok' | 'pinterest' | 'linkedin';
+export const NETS: Net[] = ['facebook', 'instagram', 'youtube', 'tiktok', 'pinterest', 'linkedin'];
+export const NET_NAME: Record<Net, string> = { facebook: 'Facebook', instagram: 'Instagram', youtube: 'YouTube', tiktok: 'TikTok', pinterest: 'Pinterest', linkedin: 'LinkedIn' };
+export const NET_COLOR: Record<Net, string> = { facebook: '#1877F2', instagram: '#D6249F', youtube: '#FF0000', tiktok: '#111111', pinterest: '#E60023', linkedin: '#0A66C2' };
 
 export function NetLogo({ net, size = 20, style }: { net: Net | string; size?: number; style?: CSSProperties }) {
   const s = { width: size, height: size, display: 'inline-block', flex: 'none', ...style };
@@ -18,6 +18,10 @@ export function NetLogo({ net, size = 20, style }: { net: Net | string; size?: n
       <path d="M13.6 5.5h2.1c.2 1.5 1.2 2.6 2.7 2.8v2.1c-1 0-2-.3-2.8-.9v4.3a3.9 3.9 0 1 1-3.9-3.9c.2 0 .4 0 .6.1v2.1a1.8 1.8 0 1 0 1.3 1.7z" fill="#25F4EE" transform="translate(-.6 -.4)" />
       <path d="M13.6 5.5h2.1c.2 1.5 1.2 2.6 2.7 2.8v2.1c-1 0-2-.3-2.8-.9v4.3a3.9 3.9 0 1 1-3.9-3.9c.2 0 .4 0 .6.1v2.1a1.8 1.8 0 1 0 1.3 1.7z" fill="#FE2C55" transform="translate(.6 .4)" />
       <path d="M13.6 5.5h2.1c.2 1.5 1.2 2.6 2.7 2.8v2.1c-1 0-2-.3-2.8-.9v4.3a3.9 3.9 0 1 1-3.9-3.9c.2 0 .4 0 .6.1v2.1a1.8 1.8 0 1 0 1.3 1.7z" fill="#fff" /></svg>);
+  if (net === 'pinterest') return (
+    <svg viewBox="0 0 24 24" style={s} aria-label="Pinterest"><rect width="24" height="24" rx="6.5" fill="#E60023" /><path d="M10.2 19.2V6.4h3.1a3 3 0 0 1 0 6h-3.1" fill="none" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" transform="translate(.8 0)" /></svg>);
+  if (net === 'linkedin') return (
+    <svg viewBox="0 0 24 24" style={s} aria-label="LinkedIn"><rect width="24" height="24" rx="6.5" fill="#0A66C2" /><path d="M7.9 10H5.4v8h2.5zM6.65 5.5a1.45 1.45 0 1 0 0 2.9 1.45 1.45 0 0 0 0-2.9zM18.6 18v-4.6c0-2.2-1-3.5-2.9-3.5-1.2 0-2 .5-2.35 1.15V10H10.9v8h2.5v-4.1c0-1 .45-1.6 1.35-1.6.95 0 1.35.6 1.35 1.6V18z" fill="#fff" /></svg>);
   return (
     <svg viewBox="0 0 24 24" style={s} aria-label="Facebook"><rect width="24" height="24" rx="6.5" fill="#1877F2" /><path d="M13.3 19v-6h2l.3-2.4h-2.3V9.1c0-.7.2-1.2 1.2-1.2h1.2V5.8c-.2 0-1-.1-1.8-.1-1.8 0-3 1.1-3 3.1v1.8H8.9V13h2v6z" fill="#fff" /></svg>);
 }

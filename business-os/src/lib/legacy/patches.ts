@@ -235,12 +235,116 @@ export function applyPatches(html: string, patches = PATCHES): string {
   return out;
 }
 
-/** Full HTML document: the legacy file is an artifact body, so add the document shell and the compatibility shim. */
+/** Full HTML document: the legacy file is an artifact body, so add the document shell and the compatibility shim.
+ * The redesign stylesheet loads AFTER the legacy file so its rules win ties —
+ * that is how the dashboard is reskinned without editing the legacy file itself
+ * (its patch layer must keep matching exactly once). See public/legacy/redesign.css
+ * and business-os/docs/DESIGN_SYSTEM.md. */
 export function legacyDocument(legacyHtml: string): string {
   return '<!doctype html>\n<html lang="en">\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">\n<script src="/legacy/bos-shim.js"></script>\n'
     // phone width: let cards and selects shrink instead of pushing the page sideways
     + '<style>.card div{min-width:0}.card .ctrls{flex-wrap:wrap}.card select,.card input{max-width:100%}'
     + '.brand-m{display:none}@media (max-width:860px){.brand-m{display:flex;align-items:center;flex:none;padding:0 6px 0 2px}}</style>\n'
     + '<link rel="icon" href="/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="/brand/favicon-32.png"><link rel="apple-touch-icon" href="/brand/apple-touch-icon.png"><meta name="theme-color" content="#0b372f">\n'
-    + applyPatches(legacyHtml) + '\n</html>\n';
+    + applyPatches(legacyHtml) + '\n<link rel="stylesheet" href="/legacy/redesign.css">\n</html>\n';
 }
+
+/* ===== LocalServiceHQ business (agency/LRF structure) ===== */
+PATCHES.push(
+  {
+    name: 'LocalServiceHQ: add the business to the legacy BIZ list',
+    find: `  { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
+  { id: 'itevs', name: 'Itevs Digital', color: '#1F6FB8' },`,
+    replace: `  { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
+  { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },
+  { id: 'itevs', name: 'Itevs Digital', color: '#1F6FB8' },`,
+  },
+  {
+    name: 'LocalServiceHQ: add the sidebar item under Local Revenue Flow',
+    find: `      <button class="nav" data-go="biz:lrf"><svg viewBox="0 0 16 16" fill="#5FD0A3"><circle cx="8" cy="8" r="4"/></svg>Local Revenue Flow</button>`,
+    replace: `      <button class="nav" data-go="biz:lrf"><svg viewBox="0 0 16 16" fill="#5FD0A3"><circle cx="8" cy="8" r="4"/></svg>Local Revenue Flow</button>
+      <button class="nav" data-go="biz:localservicehq"><svg viewBox="0 0 16 16" fill="#4ADE80"><circle cx="8" cy="8" r="4"/></svg>LocalServiceHQ</button>`,
+  },
+  {
+    name: 'LocalServiceHQ: agency tabs are valid for this business too',
+    find: `(route === 'biz:lrf' ?`,
+    replace: `((route === 'biz:lrf' || route === 'biz:localservicehq') ?`,
+  },
+  {
+    name: 'LocalServiceHQ: tabsFor uses the agency tab set',
+    find: `const tabsFor = (r) => (r === 'biz:lrf' ? ATABS :`,
+    replace: `const tabsFor = (r) => ((r === 'biz:lrf' || r === 'biz:localservicehq') ? ATABS :`,
+  },
+  {
+    name: 'LocalServiceHQ: AG_ID must follow the active business',
+    find: `const AG_ID = 'lrf';`,
+    replace: `let AG_ID = 'lrf';`,
+  },
+  {
+    name: 'LocalServiceHQ: set AG_ID from the route on every render',
+    find: `  const isBiz = route.startsWith('biz:'); const bid = isBiz ? route.slice(4) : null;`,
+    replace: `  const isBiz = route.startsWith('biz:'); const bid = isBiz ? route.slice(4) : null;
+  AG_ID = bid === 'localservicehq' ? 'localservicehq' : 'lrf';`,
+  },
+  {
+    name: 'LocalServiceHQ: live hash target',
+    find: `const LIVE_HASH = { kidscare: '#kidscare', itevs: '#itevs', insafia: '#insafia', lrf: '#lrf', others: '#all' };`,
+    replace: `const LIVE_HASH = { kidscare: '#kidscare', itevs: '#itevs', insafia: '#insafia', lrf: '#lrf', localservicehq: '#localservicehq', others: '#all' };`,
+  },
+  {
+    name: 'LocalServiceHQ: default settings row',
+    find: `  lrf: { ad_accounts: [], margin: 80, usd_rate: 122, competitors: [] },`,
+    replace: `  lrf: { ad_accounts: [], margin: 80, usd_rate: 122, competitors: [] },
+  localservicehq: { ad_accounts: [], margin: 85, usd_rate: 122, competitors: [] },`,
+  },
+  // Social Media tab for the agency businesses (owner request 2026-11-01 for LocalServiceHQ; LRF shares the
+  // same ATABS set, so it gains the tab too). The native /social/<business> page and its APIs are already
+  // business-generic — only the agency tab bar, route allow-list and view dispatch were missing the entry.
+  {
+    name: 'Agency tabs: Social Media tab, after Content',
+    find: `['outreach', 'Outreach'], ['content', 'Content'], ['pipeline', 'Pipeline'],`,
+    replace: `['outreach', 'Outreach'], ['content', 'Content'], ['social', 'Social Media'], ['pipeline', 'Pipeline'],`,
+  },
+  {
+    name: 'Agency tabs: social is an allowed route',
+    find: `'outreach','content','pipeline'`,
+    replace: `'outreach','content','social','pipeline'`,
+  },
+  {
+    name: 'Agency tabs: social view (native page in a frame, same as other businesses)',
+    find: `product: bizProduct, content: bizContent, competitors: bizContent, team: bizTeam, calendar: bizCalendar, settings: bizSettings };`,
+    replace: `product: bizProduct, content: bizContent, competitors: bizContent, team: bizTeam, social: socialView, calendar: bizCalendar, settings: bizSettings };`,
+  },
+);
+
+/* ===== Personal Brand business (owner request 2026-11-02: a home for the owner's personal-profile
+   social accounts — the LRF 90-day plan posts from personal profiles, not the company page).
+   Renamed the same evening at the owner's insistence: in the Business list it must read exactly
+   "Imran Hossain Alif", like the other business names — the "Personal Brand" label confused him.
+   The id stays 'personalbrand'; only display names changed, no data touched.
+   A REGULAR business: it keeps the standard BTABS set, which already includes the Social Media tab,
+   so only the BIZ list and the sidebar item need the new entry. The native /social/<business> page
+   and its APIs are business-generic and validate against BIZ_IDS (src/lib/business.ts), which gains
+   the same entry. No existing business or data is touched.
+   Placement note: the BIZ entry is inserted BEFORE the lrf line, not after localservicehq — the
+   patch test requires every earlier patch's replace string to survive verbatim in the final output,
+   and the LocalServiceHQ patches own the contiguous lrf → localservicehq → itevs sequence. ===== */
+PATCHES.push(
+  {
+    name: 'Personal Brand: add the business to the legacy BIZ list',
+    find: `  { id: 'insafia', name: 'Insafia', color: '#A34B3B' },
+  { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
+  { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },`,
+    replace: `  { id: 'insafia', name: 'Insafia', color: '#A34B3B' },
+  { id: 'personalbrand', name: 'Imran Hossain Alif', color: '#0891B2' },
+  { id: 'lrf', name: 'Local Revenue Flow', color: '#13896F' },
+  { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },`,
+  },
+  {
+    name: 'Personal Brand: add the sidebar item under LocalServiceHQ',
+    find: `      <button class="nav" data-go="biz:localservicehq"><svg viewBox="0 0 16 16" fill="#4ADE80"><circle cx="8" cy="8" r="4"/></svg>LocalServiceHQ</button>`,
+    replace: `      <button class="nav" data-go="biz:localservicehq"><svg viewBox="0 0 16 16" fill="#4ADE80"><circle cx="8" cy="8" r="4"/></svg>LocalServiceHQ</button>
+      <button class="nav" data-go="biz:personalbrand"><svg viewBox="0 0 16 16" fill="#22D3EE"><circle cx="8" cy="8" r="4"/></svg>Imran Hossain Alif</button>`,
+  },
+);
+

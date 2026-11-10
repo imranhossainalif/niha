@@ -33,3 +33,23 @@ describe('Meta ads → Supermetrics-shaped rows', () => {
     expect(calls.find((u) => u.includes('/insights'))).toContain('level=account');
   });
 });
+
+describe('Meta ads token fallback (second portfolio token)', () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const row2 = { spend: '12.50', impressions: '1000', cpm: '12.5', frequency: '1.3', inline_link_click_ctr: '1.2', date_start: '2026-10-20' };
+
+  it('falls back to the second token when the first gets a #200 permission error', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => {
+      if (u.includes('badtok')) return Response.json({ error: { message: '(#200) Ad account owner has NOT grant ads_management or ads_read permission', code: 200 } }, { status: 400 });
+      if (u.includes('/insights')) return Response.json({ data: [{ ...row2 }] });
+      return Response.json({ name: 'Kids Care Ads' });
+    }));
+    const r = await metaAdsQuery({ ds_id: 'FA', ds_accounts: ['act_1'], fields: 'profile,Date,cost', date_range_type: 'last_30_days' }, ['badtok', 'goodtok']);
+    expect(r.data).toEqual([['profile', 'Date', 'cost'], ['Kids Care Ads', '2026-10-20', 12.5]]);
+  });
+
+  it('throws the first token error when every token fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (u: string) => Response.json({ error: { message: u.includes('tokone') ? 'first fail' : 'second fail', code: 200 } }, { status: 400 })));
+    await expect(metaAdsQuery({ ds_id: 'FA', ds_accounts: ['act_1'], fields: 'cost', date_range_type: 'last_30_days' }, ['tokone', 'toktwo'])).rejects.toThrow('first fail');
+  });
+});

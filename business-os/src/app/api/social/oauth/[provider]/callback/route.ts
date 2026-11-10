@@ -1,11 +1,14 @@
 import { cookies } from 'next/headers';
 import { db } from '@/lib/db';
-import { saveSecret } from '@/lib/config';
+import { readSecret, saveSecret } from '@/lib/config';
 import { requestPrincipal } from '@/lib/session';
 import { isFull } from '@/lib/access';
 import { exchangeCode, type Provider } from '@/lib/social/oauth';
 import { channel } from '@/lib/social/youtube';
 import { profile } from '@/lib/social/tiktok';
+import { pinBoards, pinProfile } from '@/lib/social/pinterest';
+import { liProfile } from '@/lib/social/linkedin';
+import { discoverAccounts, metaMe } from '@/lib/social/meta';
 
 const origin = (req: Request) => { const h = req.headers, host = h.get('x-forwarded-host') || h.get('host'); return host ? (h.get('x-forwarded-proto') || 'https') + '://' + host : new URL(req.url).origin; };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
@@ -30,6 +33,52 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   if (!code) return page(false, 'Code pawa jayni.', st.business);
   try {
     const t = await exchangeCode(provider, code, origin(req));
+    if (provider === 'meta') {
+      // One-click Facebook + Instagram: keep the long-lived user token as a shared secret (publishing/analytics
+      // derive page tokens from it) and connect every Page / Instagram this login can manage to this business.
+      const me = await metaMe(t.access_token);
+      await saveSecret('meta:user', { access_token: t.access_token, expires_at: t.expires_at, user_id: me.id, name: me.name });
+      // Keep a short history of recent logins too: 'meta:user' is overwritten by the NEXT connect, and a
+      // later connect (maybe for another business, with a narrower Page picker — possibly by the same
+      // Facebook user) must not erase the only token that could manage some other business's Page.
+      // Publishing derives a Page token from any stored login that can manage it (metaTokens in meta.ts).
+      const prevLogins = (await readSecret<{ access_token: string; expires_at: number }[]>('meta:users').catch(() => null)) ?? [];
+      const logins = [{ access_token: t.access_token, expires_at: t.expires_at, user_id: me.id },
+        ...prevLogins.filter((x) => x.access_token !== t.access_token && x.expires_at > Date.now() + 60e3)].slice(0, 6);
+      await saveSecret('meta:users', logins);
+      const found = await discoverAccounts(t.access_token);
+      const biz = st.business || 'kidscare';
+      for (const a of found) {
+        const ref = db(p).collection('social_accounts').doc(a.network + '_' + a.ext_id);
+        // An account already connected to ANOTHER business stays with that business — a connect here
+        // must not silently steal it (the doc holds one business; Accounts → discover is the explicit
+        // way to move an account). Only brand-new accounts join this business.
+        const curBiz = ((await ref.get())?.data as { business?: string } | undefined)?.business;
+        await ref.set({ business: curBiz || biz, network: a.network, ext_id: a.ext_id, page_id: a.network === 'facebook' ? a.ext_id : a.page_id || '', name: a.name, username: a.username, picture: a.picture, followers: a.followers, active: true, connected_at: new Date().toISOString(), error: '' });
+      }
+      if (!found.length) return page(false, 'Kono Facebook Page pawa jayni — je Facebook account diye login korechen sheta diye ekta Page manage thakte hobe. Page thakle abar connect kore Page ta select korun.', biz);
+      return page(true, found.length + ' ta account connect hoyeche: ' + found.map((a) => a.name).join(', ') + '. Ei window bondho korun.', biz);
+    }
+    if (provider === 'pinterest') {
+      // Pinterest: the account's boards are saved with it — publishing defaults to the first board.
+      const info = await pinProfile(t.access_token);
+      const boards = await pinBoards(t.access_token).catch(() => []);
+      const id = 'pinterest_' + info.id;
+      await saveSecret('oauth:' + id, t);
+      await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'pinterest', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
+        boards, board_id: boards[0]?.id || '', scope: t.scope, active: true, connected_at: new Date().toISOString(), error: '' });
+      return page(true, 'Pinterest account "@' + info.username + '" connect hoyeche' + (boards.length ? ' (' + boards.length + ' ta board, prothom board "' + boards[0].name + '" e pin jabe)' : ' (kono board pawa jayni — Pinterest e ekta board banan)') + '. Ei window bondho korun.', st.business);
+    }
+    if (provider === 'linkedin') {
+      // LinkedIn: the member's own profile (OIDC sub is the identity). The token has no refresh
+      // token at this tier — it lives ~60 days in the secret, then the owner reconnects.
+      const info = await liProfile(t.access_token);
+      const id = 'linkedin_' + info.id;
+      await saveSecret('oauth:' + id, t);
+      await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'linkedin', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
+        scope: t.scope, token_expires_at: new Date(t.expires_at).toISOString(), active: true, connected_at: new Date().toISOString(), error: '' });
+      return page(true, 'LinkedIn profile "' + info.name + '" connect hoyeche. Token ~60 din thakbe — meyad shesh hole ek click e abar connect korte hobe. Ei window bondho korun.', st.business);
+    }
     const info = provider === 'youtube' ? await channel(t.access_token) : await profile(t.access_token);
     const id = provider + '_' + info.id;
     await saveSecret('oauth:' + id, t);

@@ -1,0 +1,10 @@
+{
+ "business": "localservicehq",
+ "stage": "Match to contractor",
+ "how": "Directory + lead routing",
+ "offer": "Lead delivered to a pro",
+ "price": "$25-$75 per lead",
+ "audience": "Contractor",
+ "order": 4,
+ "status": "active"
+}

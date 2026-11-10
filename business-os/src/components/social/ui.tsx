@@ -4,10 +4,10 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import { Icon, NetLogo, type Net } from './icons';
 
 export type { Net };
-export type Account = { id: string; network: Net; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; business: string; error?: string };
+export type Account = { id: string; network: Net; ext_id: string; page_id: string; name: string; username?: string; picture?: string; followers?: number; business: string; board_id?: string; boards?: { id: string; name: string }[]; error?: string };
 export type MediaRef = { id: string; url: string; mime: string };
 export type Target = { account_id: string; network: Net; name?: string; text?: string; status?: string; ext_post_id?: string; permalink?: string; error?: string; note?: string };
-export type PostOptions = { yt_title?: string; yt_privacy?: 'public' | 'unlisted' | 'private'; yt_kids?: boolean; tt_mode?: 'direct' | 'inbox'; tt_privacy?: string };
+export type PostOptions = { yt_title?: string; yt_privacy?: 'public' | 'unlisted' | 'private'; yt_kids?: boolean; tt_mode?: 'direct' | 'inbox'; tt_privacy?: string; pin_board?: string };
 export type Post = { id: string; version?: number; business: string; status: string; text: string; media: MediaRef[]; link?: string; labels?: string[]; content_type?: string; targets: Target[]; scheduled_at?: string | null; published_at?: string; error?: string; created_by?: string; options?: PostOptions };
 
 export async function api<T = any>(url: string, init: RequestInit & { json?: unknown } = {}): Promise<T> {

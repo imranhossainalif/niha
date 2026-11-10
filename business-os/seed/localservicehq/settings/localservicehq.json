@@ -1,0 +1,16 @@
+{
+ "targets": {
+  "email_sent": 100,
+  "li_conn_sent": 20,
+  "li_dm_sent": 15,
+  "li_posts": 2,
+  "ig_posts": 2,
+  "ig_dm_sent": 20,
+  "fb_posts": 3,
+  "fb_comments_made": 15,
+  "calls_made": 30
+ },
+ "mrr_goal": 3000,
+ "usd_rate": 122,
+ "margin": 85
+}

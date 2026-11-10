@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { analyze, bdHour, bdWeekday, engagement, engRate } from '@/lib/social/analytics';
-import { fbFormat, igFormat, publishFacebook, publishInstagram, type Fetch } from '@/lib/social/meta';
+import { fbFormat, igFormat, metaAuthUrl, metaExchangeCode, publishFacebook, publishInstagram, type Fetch } from '@/lib/social/meta';
 
 const post = (created: string, format: string, m: Record<string, number>, content_type?: string) => ({ network: 'facebook', account_id: 'p', ext_id: created, created, format, content_type, metrics: { reactions: 0, comments: 0, shares: 0, ...m } });
 
@@ -58,6 +58,30 @@ function fakeGraph() {
   return { f, calls };
 }
 
+describe('Meta one-click connect (mocked)', () => {
+  it('login URL points at the Facebook dialog with the posting scopes', () => {
+    const u = new URL(metaAuthUrl('APP1', 'https://os.example/api/social/oauth/meta/callback', 'st8'));
+    expect(u.origin + u.pathname).toBe('https://www.facebook.com/v21.0/dialog/oauth');
+    expect(u.searchParams.get('client_id')).toBe('APP1');
+    expect(u.searchParams.get('redirect_uri')).toContain('/api/social/oauth/meta/callback');
+    expect(u.searchParams.get('scope')).toContain('pages_manage_posts');
+    expect(u.searchParams.get('scope')).toContain('instagram_content_publish');
+  });
+  it('code exchange upgrades the short token to a long-lived one', async () => {
+    const grants: (string | null)[] = [];
+    const f = (async (input: any) => {
+      const u = new URL(String(input));
+      grants.push(u.searchParams.get('grant_type'));
+      const long = u.searchParams.get('grant_type') === 'fb_exchange_token';
+      return { ok: true, status: 200, json: async () => ({ access_token: long ? 'LONG' : 'SHORT', expires_in: long ? 5184000 : 3600 }) };
+    }) as Fetch;
+    const t = await metaExchangeCode('APP1', 'SEC', 'CODE', 'https://os.example/cb', f);
+    expect(grants).toEqual([null, 'fb_exchange_token']);
+    expect(t.access_token).toBe('LONG');
+    expect(t.expires_at).toBeGreaterThan(Date.now() + 50 * 86400e3);
+  });
+});
+
 describe('publishing (mocked Meta)', () => {
   it('Facebook: one photo goes to /photos with the page token', async () => {
     const g = fakeGraph();
@@ -84,6 +108,36 @@ describe('publishing (mocked Meta)', () => {
   it('Instagram: refuses text-only posts', async () => {
     const g = fakeGraph();
     await expect(publishInstagram('IG1', 'PAGE4', { text: 'only text', media: [] }, 'USER', g.f)).rejects.toThrow(/chobi ba video/);
+  });
+  it('Facebook: falls back to the next stored login when one cannot manage the page', async () => {
+    // Each Facebook login is limited to the Pages picked in its run — the page token must come from
+    // whichever stored login can manage THIS page, not only from the latest login.
+    const seen: string[] = [];
+    const f = (async (input: string | URL, init?: RequestInit) => {
+      const u = new URL(String(input));
+      const params = Object.fromEntries(init?.method === 'POST' ? new URLSearchParams(String(init.body)) : u.searchParams);
+      const path = u.pathname.replace(/^\/v21\.0/, '');
+      const ok = (j: unknown) => new Response(JSON.stringify(j), { status: 200 });
+      if (params.fields === 'access_token') {
+        seen.push(params.access_token);
+        if (params.access_token === 'BAD') return new Response(JSON.stringify({ error: { message: '(#100) Object does not exist', code: 100 } }), { status: 400 });
+        return ok({ access_token: 'PAGE_TOKEN' });
+      }
+      if (path.endsWith('/photos')) return ok({ id: 'ph1', post_id: 'page_post9' });
+      if (params.fields === 'permalink_url') return ok({ permalink_url: 'https://fb/p' });
+      return ok({});
+    }) as Fetch;
+    const r = await publishFacebook('PAGE9', { text: 'Hi', media: [{ url: 'https://x/a.jpg', mime: 'image/jpeg' }] }, ['BAD', 'GOOD'], f);
+    expect(r.ext_post_id).toBe('page_post9');
+    expect(seen).toEqual(['BAD', 'GOOD']);
+  });
+  it('Facebook: when no stored login can manage the page, Meta’s own error surfaces', async () => {
+    const f = (async (input: string | URL) => {
+      const u = new URL(String(input));
+      if (u.searchParams.get('fields') === 'access_token') return new Response(JSON.stringify({ error: { message: '(#100) Object does not exist', code: 100 } }), { status: 400 });
+      return new Response(JSON.stringify({}), { status: 200 });
+    }) as Fetch;
+    await expect(publishFacebook('PAGE10', { text: 'Hi', media: [{ url: 'https://x/a.jpg', mime: 'image/jpeg' }] }, ['BAD1', 'BAD2'], f)).rejects.toThrow(/#100/);
   });
 });
 

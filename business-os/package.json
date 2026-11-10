@@ -12,7 +12,8 @@
     "db:import": "tsx scripts/import_data.ts",
     "user:create": "tsx scripts/create_user.ts",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:lsq": "tsx scripts/import_data.ts seed/localservicehq"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.135.0",

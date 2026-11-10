@@ -1,0 +1,82 @@
+/* EasyFounder redesign layer for the legacy dashboard (/app).
+ *
+ * Loaded AFTER legacy/business-os.html by legacyDocument() (src/lib/legacy/patches.ts),
+ * so these rules win ties over the artifact's own <style>. The legacy file itself
+ * is never edited — its patch layer (86 find/replace ops) must keep matching
+ * exactly once, so the redesign lives here, not there.
+ *
+ * Tokens are the single source of truth shared with src/app/globals.css,
+ * tailwind.config.ts and src/components/social/social.css.
+ * tests/design-tokens.test.ts checks they agree.
+ * Rules: business-os/docs/DESIGN_SYSTEM.md
+ */
+
+/* ---- tokens (same values as globals.css) ---- */
+:root {
+  --bg: #F2F5F4; --panel: #FFFFFF; --soft: #EAF0EE; --fg: #14211E; --text: #14211E; --muted: #5C6E69; --line: #D7E0DD;
+  --side: #0F3D35; --side-fg: #E3F0EC; --side-mute: #8DB3A9; --side-act: #1B5A4E; --accent: #13896F;
+  --accent-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --good: #0E8A62; --warn: #B8650E; --bad: #C2363F; --info: #2F6FD1;
+  --biz-kidscare: #C9661C; --biz-insafia: #A34B3B; --biz-lrf: #13896F; --biz-localservicehq: #16A34A;
+  --biz-personalbrand: #0891B2; --biz-itevs: #1F6FB8; --biz-hajj: #7C3AED; --biz-others: #5F7A74; --biz-personal: #6A4FC4;
+  --dark: #16211F; --dark-fg: #E6EFEC; --dark-mute: #9FB4AE; --dark-line: rgba(255, 255, 255, .08);
+  --sh1: 0 1px 2px rgba(16, 33, 30, .06), 0 1px 1px rgba(16, 33, 30, .04);
+  --sh2: 0 10px 30px -8px rgba(16, 33, 30, .18), 0 2px 6px rgba(16, 33, 30, .06);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D1412; --panel: #151F1C; --soft: #1C2925; --fg: #E3ECE9; --text: #E3ECE9; --muted: #93A6A0; --line: #28372F;
+    --side: #0A2621; --side-fg: #E3F0EC; --side-mute: #7FA197; --side-act: #174A40; --accent: #34C08E;
+    --dark: #0F1816; --dark-line: rgba(255, 255, 255, .07); --good: #34C08E; --warn: #E8973A; --bad: #EE6B73; --info: #6BA4F5;
+    --sh1: 0 1px 2px rgba(0, 0, 0, .4); --sh2: 0 12px 32px -8px rgba(0, 0, 0, .6);
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D1412; --panel: #151F1C; --soft: #1C2925; --fg: #E3ECE9; --text: #E3ECE9; --muted: #93A6A0; --line: #28372F;
+  --side: #0A2621; --side-fg: #E3F0EC; --side-mute: #7FA197; --side-act: #174A40; --accent: #34C08E;
+  --dark: #0F1816; --dark-line: rgba(255, 255, 255, .07); --good: #34C08E; --warn: #E8973A; --bad: #EE6B73; --info: #6BA4F5;
+  --sh1: 0 1px 2px rgba(0, 0, 0, .4); --sh2: 0 12px 32px -8px rgba(0, 0, 0, .6);
+}
+
+/* ---- base: 14px/1.5, tabular numerals for numbers ---- */
+body { line-height: 1.5; }
+.num { font-variant-numeric: tabular-nums; }
+
+/* ---- cards: one shadow, one radius ---- */
+.card { box-shadow: var(--sh1); }
+
+/* ---- KPI tiles: calm white cards, one accent bar, one headline number.
+   The old tiles were six saturated colors with white text — everything shouted,
+   so nothing stood out (PFD L1: one dominant weight per screen). ---- */
+.tile { background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-top: 3px solid var(--c, var(--accent)); box-shadow: var(--sh1); }
+.tile::after { display: none; }
+.tile small { color: var(--muted); opacity: 1; }
+.tile b { color: var(--fg); font-variant-numeric: tabular-nums; }
+.tile span { color: var(--muted); opacity: 1; }
+
+/* ---- sidebar: badge uses the status token; business dots use the canonical colors ---- */
+.nav .badge { background: var(--bad); }
+.nav[data-go="biz:kidscare"] svg circle { fill: var(--biz-kidscare); }
+.nav[data-go="biz:insafia"] svg circle { fill: var(--biz-insafia); }
+.nav[data-go="biz:lrf"] svg circle { fill: var(--biz-lrf); }
+.nav[data-go="biz:localservicehq"] svg circle { fill: var(--biz-localservicehq); }
+.nav[data-go="biz:personalbrand"] svg circle { fill: var(--biz-personalbrand); }
+.nav[data-go="biz:itevs"] svg circle { fill: var(--biz-itevs); }
+.nav[data-go="biz:hajj"] svg circle { fill: var(--biz-hajj); }
+.nav[data-go="biz:others"] svg circle { fill: var(--biz-others); }
+.nav[data-go="biz:personal"] svg circle { fill: var(--biz-personal); }
+
+/* ---- tables: sticky header, row hover, tabular numerals ---- */
+table thead th { position: sticky; top: 0; background: var(--panel); z-index: 1; }
+table tbody tr:hover { background: var(--soft); }
+table td.num, table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---- status: color + text, never color alone (kept from the old .good/.warn/.bad hooks) ---- */
+.good { color: var(--good); }
+.warn { color: var(--warn); }
+.bad { color: var(--bad); }
+
+/* ---- skeleton: loading state instead of a flash of empty ---- */
+@keyframes bos-shimmer { 0% { background-position: -400px 0; } 100% { background-position: 400px 0; } }
+.skel { border-radius: 10px; background: linear-gradient(90deg, var(--soft) 0, color-mix(in srgb, var(--soft) 40%, var(--panel)) 40%, var(--soft) 80%); background-size: 800px 100%; animation: bos-shimmer 1.2s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }

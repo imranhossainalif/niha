@@ -1,0 +1,24 @@
+{
+  "month": "2026-10",
+  "asof": "2026-10-31T03:20:00Z",
+  "source": "nuport+ads+fixed",
+  "sales": 412500,
+  "cost": 268400,
+  "orders": 315,
+  "estimate": false,
+  "ads_usd": 182.5,
+  "ads_rate": 122,
+  "ads_usd_manual": 0,
+  "sm_ads_usd": 180,
+  "wb": { "opening": 12000, "closing": 18500 },
+  "other_costs": [
+    { "name": "packaging", "amount": 9200 },
+    { "name": "delivery shortfall", "amount": 3100 }
+  ],
+  "other_note": "Courier return charge included.",
+  "last_date": "2026-10-30",
+  "items": [
+    { "name": "Makhna 250g", "qty": 120, "sales": 144000, "cost": 96000 },
+    { "name": "Makhna 500g", "qty": 95, "sales": 218500, "cost": 156500 }
+  ]
+}

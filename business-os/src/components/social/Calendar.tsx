@@ -62,6 +62,7 @@ export function Calendar({ business, refresh, nets, onOpen, onNew }: { business:
         <span className="row" style={{ gap: 4, paddingLeft: 4 }}>{ns.map((n) => <NetLogo key={n} net={n} size={14} />)}<b>{when(p) ? timeLocal(when(p)) : 'Draft'}</b><span className="grow" />{!mini && <span className="xs" style={{ color: c, fontWeight: 700 }}>{l}</span>}</span>
         {!mini && m && (m.mime.startsWith('video/') ? <video className="thumb" src={m.url} muted preload="metadata" /> : <img className="thumb" src={m.url} alt="" loading="lazy" />)}
         <span className={mini ? 'clamp2 xs' : 'clamp2'} style={{ paddingLeft: 4 }}>{p.text || <i className="muted">(lekha nai)</i>}</span>
+        {!mini && (p.status === 'failed' || p.status === 'partial') && p.error && <span className="clamp2 xs" style={{ paddingLeft: 4, color: 'var(--bad)' }} title={p.error}>{p.error}</span>}
       </button>
     );
   };
@@ -85,7 +86,7 @@ export function Calendar({ business, refresh, nets, onOpen, onNew }: { business:
           {NETS.filter((n) => nets.includes(n)).map((n) => <button key={n} type="button" className="sm-chip" aria-pressed={!netF.length || netF.includes(n)} onClick={() => setNetF((f) => (f.includes(n) ? f.filter((x) => x !== n) : [...f, n]))}><NetLogo net={n} size={18} />{NET_NAME[n]}</button>)}
         </div>
         <span className="grow" />
-        <div style={{ position: 'relative' }}><Icon name="search" size={15} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--muted)' }} /><input className="sm-input" style={{ width: 190, paddingLeft: 32 }} placeholder="Post khujun" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <div style={{ position: 'relative', flex: '1 1 170px', maxWidth: 260 }}><Icon name="search" size={15} style={{ position: 'absolute', left: 10, top: 10, color: 'var(--muted)' }} /><input className="sm-input" style={{ width: '100%', paddingLeft: 32 }} placeholder="Post khujun" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <select className="sm-input" style={{ width: 'auto' }} value={status} onChange={(e) => setStatus(e.target.value)} aria-label="Status"><option value="">Shob status</option>{Object.entries(STATUS).map(([k, [l]]) => <option key={k} value={k}>{l}</option>)}</select>
       </div>
       <div className="sm-loadbar" style={{ visibility: loading && posts ? 'visible' : 'hidden' }} />

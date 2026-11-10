@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, Label, Modal, Seg, TYPE_LABEL, upload, useToast, WEEKDAYS, type Account, type MediaRef, type Post, type PostOptions } from './ui';
 
-const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200 };
+const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200, pinterest: 800, linkedin: 3000 };
 const toLocalInput = (iso?: string | null) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const isVideo = (m: { mime: string }) => m.mime.startsWith('video/');
 export type Draft = Partial<Post> & { idea_label?: string };
@@ -56,6 +56,7 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
     if (nets.includes('instagram') && media.length > 10) p.push('Instagram e 10 tar beshi na.');
     if (nets.includes('facebook') && media.length > 1 && media.some(isVideo)) p.push('Facebook e video ekta-i (chobir sathe na).');
     for (const n of ['youtube', 'tiktok'] as Net[]) if (nets.includes(n) && (media.length !== 1 || !isVideo(media[0]))) p.push(NET_NAME[n] + ' e ekta video lagbe (chobi na).');
+    if (nets.includes('pinterest') && !media.some((m) => !isVideo(m))) p.push('Pinterest e chobi lagbe (video pin ekhono na).');
     for (const a of chosen) if (textFor(a.id).length > LIMIT[a.network]) p.push(a.name + ' (' + NET_NAME[a.network] + '): lekha ' + LIMIT[a.network] + ' okkhorer beshi.');
     if (!media.length && !text.trim() && !link) p.push('Kichu likhun ba chobi/video din.');
     return p;
@@ -97,6 +98,9 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
   const quick: [string, Date][] = [];
   { const d = new Date(); d.setHours(20, 0, 0, 0); if (d.getTime() > Date.now() + 10 * 60e3) quick.push(['Aaj raat 8ta', d]); const k = new Date(); k.setDate(k.getDate() + 1); k.setHours(10, 0, 0, 0); quick.push(['Kal sokal 10ta', k]); }
   for (const b of (best ?? []).slice(0, 2)) quick.push(['★ ' + WEEKDAYS[b.weekday] + ' ' + String(b.hour).padStart(2, '0') + ':00', nextSlot(b.weekday, b.hour + 1)]);
+  // Why the last publish failed (stored by the publisher on the post / its targets) — shown when editing
+  // a failed or partial post, instead of the bare "Hoyni" the calendar used to be the only signal.
+  const prevErr = initial?.error || (initial?.targets ?? []).filter((t) => t.status === 'failed' && t.error).map((t) => (t.name || t.network) + ': ' + t.error).join(' | ');
   const preview = accounts.find((a) => a.id === (pv || (tab !== 'all' ? tab : '')) && sel.includes(a.id)) ?? chosen[0];
   const counts = chosen.map((a) => ({ a, n: textFor(a.id).length, max: LIMIT[a.network] }));
 
@@ -164,7 +168,7 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
             <input ref={file} type="file" accept="image/jpeg,image/png,image/webp,video/mp4,video/quicktime" multiple hidden onChange={(e) => { addFiles(e.target.files); e.target.value = ''; }} />
           </div>
 
-          {(nets.includes('youtube') || nets.includes('tiktok')) && (
+          {(nets.includes('youtube') || nets.includes('tiktok') || nets.includes('pinterest')) && (
             <div className="sm-grid sm-g2 sm-fade">
               {nets.includes('youtube') && (
                 <div className="sm-card flat stack" style={{ padding: 12 }}>
@@ -185,6 +189,16 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
                   <span className="muted xs">{opt.tt_mode === 'direct' ? 'TikTok audit er age shorasori post "Only me" hoye jay.' : 'Video TikTok app e notification hishebe jabe — sound/effect diye okhan theke post korun.'}</span>
                 </div>
               )}
+              {nets.includes('pinterest') && (
+                <div className="sm-card flat stack" style={{ padding: 12 }}>
+                  <span className="row" style={{ fontWeight: 700 }}><NetLogo net="pinterest" size={18} />Pinterest</span>
+                  <label className="sm-label">Board<select className="sm-input" value={opt.pin_board ?? ''} onChange={(e) => setOpt({ ...opt, pin_board: e.target.value || undefined })} aria-label="Pinterest board">
+                    <option value="">Account er prothom board</option>
+                    {chosen.filter((a) => a.network === 'pinterest').flatMap((a) => (a.boards ?? []).map((b) => <option key={a.id + b.id} value={b.id}>{a.name}: {b.name}</option>))}
+                  </select></label>
+                  <span className="muted xs">Shudhu prothom chobi ta pin hobe; post er prothom line = pin er title, purota = description (800 okkhor). Link thakle pin shekhane-i jabe.</span>
+                </div>
+              )}
             </div>
           )}
 
@@ -197,6 +211,7 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
             </div>
           </details>
 
+          {editing && prevErr && <div className="sm-warn err sm-fade"><Icon name="alert" />Shesh bar hoyni: {prevErr}</div>}
           {err ? <div className="sm-warn err sm-fade"><Icon name="alert" />{err}</div> : problems.length > 0 && chosen.length > 0 && <div className="sm-warn"><Icon name="alert" />{problems[0]}{problems.length > 1 ? ' (+' + (problems.length - 1) + ')' : ''}</div>}
         </div>
 
@@ -230,6 +245,12 @@ export function PostPreview({ a, text, media, link, title }: { a: Account; text:
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '40px 12px 14px', background: 'linear-gradient(transparent, rgba(0,0,0,.75))', color: '#fff', fontSize: 13 }}><b>@{name}</b><div className="clamp3" style={{ whiteSpace: 'pre-wrap' }}>{text}</div></div>
       <div style={{ position: 'absolute', right: 10, bottom: 90, display: 'grid', gap: 14, color: '#fff', justifyItems: 'center' }}><Icon name="heart" size={26} /><Icon name="comment" size={26} /><Icon name="share" size={26} /></div>
     </div>);
+  if (a.network === 'pinterest') return (
+    <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden', maxWidth: 300, margin: '0 auto' }}>
+      {vis({ width: '100%', aspectRatio: '2/3' })}
+      <div style={{ padding: 12, display: 'grid', gap: 4 }}><b style={{ fontSize: 15 }}>{(text.split('\n')[0] || 'Pin er title').slice(0, 100)}</b>
+        <span className="muted xs clamp3" style={{ whiteSpace: 'pre-wrap' }}>{text}</span>{link && <span className="muted xs">🔗 {link}</span>}</div>
+    </div>);
   if (a.network === 'youtube') return (
     <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>
       {vis({ width: '100%', aspectRatio: '16/9' })}
@@ -237,6 +258,11 @@ export function PostPreview({ a, text, media, link, title }: { a: Account; text:
         <span className="row muted xs"><Avatar a={a} size={22} />{a.name} · ekhoni</span><span className="muted xs clamp3" style={{ whiteSpace: 'pre-wrap' }}>{text}</span></div>
     </div>);
   const body = <p style={{ whiteSpace: 'pre-wrap', fontSize: 14, margin: 0 }}>{a.network === 'instagram' ? <><b>{name}</b> {text}</> : text}</p>;
+  if (a.network === 'linkedin') return (
+    <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>
+      <div className="row" style={{ padding: 10 }}><Avatar a={a} size={34} /><div><b className="sm-t">{name}</b><div className="muted xs">LinkedIn · Ekhon · 🌐</div></div></div>
+      <div style={{ padding: '0 12px 12px' }}>{body}{link && <div className="muted xs" style={{ marginTop: 8 }}>🔗 {link}</div>}<div className="muted xs" style={{ marginTop: 8 }}>Shudhu lekha jabe — chobi/video ekhono na.</div></div>
+    </div>);
   return (
     <div className="sm-fade sm-card" style={{ padding: 0, overflow: 'hidden' }}>
       <div className="row" style={{ padding: 10 }}><Avatar a={a} size={34} /><div><b className="sm-t">{name}</b><div className="muted xs">{a.network === 'instagram' ? 'Instagram' : 'Ekhon · 🌐'}</div></div></div>

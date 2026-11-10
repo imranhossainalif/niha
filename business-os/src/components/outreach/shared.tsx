@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import type { Activity, Prospect, Settings } from '@/lib/outreach/core';
 
-export type Data = { prospects: Prospect[]; activities: Activity[]; settings: Settings; today: string; me: string; canAdmin: boolean };
+export type Data = { prospects: Prospect[]; activities: Activity[]; settings: Settings; today: string; me: string; canAdmin: boolean; backup?: { at: string; prospects: number; activities: number } | null };
 export type LogExtra = { sender?: string; note?: string; sentiment?: string; template?: string; at?: string; next_action?: string; next_due?: string };
 export type Ctx = Data & {
   log: (p: Prospect, type: string, platform?: string, extra?: LogExtra) => Promise<Prospect | null>;

@@ -160,3 +160,21 @@ describe('outreach: review fixes', () => {
     expect(s.fields[0].type).toBe('text'); expect(s.actions[0].kind).toBe('touch');
   });
 });
+
+describe('outreach: sheet backup tables', () => {
+  it('one row per prospect and per action, platform columns only for platforms in use, BD times', async () => {
+    const { exportTables } = await import('@/lib/outreach/export');
+    const s = mergeSettings({ fields: [{ id: 'f1', label: 'Runs ads?', type: 'check' }], templates: [{ id: 't1', label: 'Opener', text: '' }] });
+    const { p, acts } = run(P({ company: 'Smith Roofing', city: 'Austin', custom: { f1: true }, tags: ['a', 'b'] }), [A('connect', 'instagram', '2026-11-10T20:30:00.000Z'), A('msg', 'instagram', '2026-11-11T05:00:00.000Z', { template: 't1' }), A('reply', 'instagram', '2026-11-12T05:00:00.000Z', { sentiment: 'positive' })]);
+    const t = exportTables([p], acts.map((a, i) => ({ ...a, id: 'a' + i })), s);
+    expect(t.prospects.rows).toHaveLength(1); expect(t.prospects.rows[0]).toHaveLength(t.prospects.head.length);
+    const cell = (h: string) => t.prospects.rows[0][t.prospects.head.indexOf(h)];
+    expect(cell('Name')).toBe('John'); expect(cell('Stage')).toBe('Warm'); expect(cell('Reply status')).toBe('Positive'); expect(cell('Runs ads?')).toBe('yes'); expect(cell('Tags')).toBe('a, b');
+    expect(cell('Instagram request sent')).toBe('2026-11-11 02:30'); // 20:30 UTC is 02:30 next day in Bangladesh
+    expect(cell('Instagram messages')).toBe(1); expect(t.prospects.head).toContain('LinkedIn link'); expect(t.prospects.head).not.toContain('TikTok link');
+    expect(t.activities.rows.map((r) => r[4])).toEqual(['Follow / request sent', 'Message sent', 'Reply received']);
+    expect(t.activities.rows[1][8]).toBe('Opener'); expect(t.activities.rows[2][6]).toBe('after 1'); expect(t.activities.rows[2][8]).toBe('Opener');
+    expect(t.daily.rows.find((r) => r[0] === '2026-11-11')).toEqual(['2026-11-11', 0, 0, 0, 1, 0, 0, 0, 0]);
+    expect(exportTables([], [], s).prospects.rows).toEqual([]);
+  });
+});

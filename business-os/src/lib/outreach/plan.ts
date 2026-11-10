@@ -213,7 +213,7 @@ export function suggestions(pl: Plan, prospects: Prospect[], acts: Activity[], t
   const blank = prospects.filter((p) => !p.industry || !p.city).length;
   if (prospects.length >= 20 && blank / prospects.length >= 0.3) tips.push({ tone: 'info', area: 'Data', title: `${pc(blank, prospects.length)}% of prospects have no industry or city`, fact: `${blank} of ${prospects.length}.`, advice: 'Fill them in (bulk edit in Prospects) — without them the lead-type analysis cannot work.', goto: { tab: 'list' } });
 
-  // 9 · goal pace and the stage gates of the plan
+  // 9 · goal pace and the stage gates of the plan (backup freshness is added by the page, which knows the backup time)
   if (pl.active) {
     const behind = [...pl.work, ...pl.steps].filter((x) => x.expected >= 3 && paceOf(x) === 'behind');
     if (behind.length) { const b = behind[0]; tips.push({ tone: 'bad', area: 'Goal', title: `Behind on the monthly goal: ${b.label.toLowerCase()}`, fact: `${b.done} done, ${b.expected} expected by today, ${b.need} needed this month (${pl.wdLeft} workdays left).`, advice: `Today's catch-up numbers are on the Tasks tab. ${b.key === 'reply' || b.key === 'positive' ? 'Volume is there — work on the message and the warm-up.' : 'This is a volume gap: protect the daily outreach block.'}`, goto: { tab: 'goal' } }); }

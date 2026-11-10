@@ -15,6 +15,7 @@ export const GET = handle(async (req: Request) => {
     allProspects(p), loadSettings(p),
     db(p).collection('outreach_activities').where('business', '==', OUTREACH_BIZ).where('day', '>=', since).limit(50000).get(),
   ]);
+  const backup = (await db(p).collection('outreach_settings').doc('backup').get())?.data ?? null;
   const activities = acts.map((a) => ({ ...(a.data as Activity), id: a.id }));
-  return json({ prospects, settings, activities, today, me: who(p), canAdmin: isFull(p) });
+  return json({ prospects, settings, activities, today, backup, me: who(p), canAdmin: isFull(p) });
 });

@@ -88,7 +88,9 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   `BENCH` assumptions) into monthly needs, pace and a catch-up target per remaining workday, which also replaces the per-rep targets on the Dashboard;
   **Tasks** — `tasksFor()` builds today's list (queues to clear + goal numbers) and ticks it off from the log, nothing is stored;
   **Suggestions** — `suggestions()` is a rule engine over the last 30 days (accept/reply rate per platform, message step, templates, warm vs cold first message,
-  reply types, lead type, speed, account safety, goal pace, plan checkpoints); every tip has a FACT line and a HYPOTHESIS line. No AI call is involved. The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
+  reply types, lead type, speed, account safety, goal pace, plan checkpoints); every tip has a FACT line and a HYPOTHESIS line. No AI call is involved.
+  **Backup:** `deploy/outreach-backup.gs` (Apps Script in Imran's Google account, hourly) pulls `GET /api/outreach/export?mark=1` (`export.ts`, tested) into the sheet
+  "EasyFounder Outreach Backup" in his Drive folder + one dated copy a day; the last run is stored in `outreach_settings/backup` and shown in Outreach → Settings. The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
 - **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
   the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,
   BM25 lookup) and the most similar past customer→TEAM reply pairs (`learn.ts`, built from `inbox_messages`, phones scrubbed, 15 min cache).

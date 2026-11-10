@@ -10,7 +10,7 @@ const ok = (schema: object, d = 'OK') => ({ description: d, content: { 'applicat
 export function openapi(origin: string) {
   return {
     openapi: '3.1.0',
-    info: { title: 'EasyFounder API', version: '1.14.0', description: 'Read and write every EasyFounder collection. Auth: `Authorization: Bearer <key>` (owner creates keys in Admin). Keys act as their owner, limited to read or read+write. Staff keys only see their assigned businesses.' },
+    info: { title: 'EasyFounder API', version: '1.15.0', description: 'Read and write every EasyFounder collection. Auth: `Authorization: Bearer <key>` (owner creates keys in Admin). Keys act as their owner, limited to read or read+write. Staff keys only see their assigned businesses.' },
     servers: [{ url: origin }],
     security: [{ bearer: [] }],
     components: {
@@ -24,6 +24,7 @@ export function openapi(origin: string) {
       '/api/outreach/prospects/{id}': { get: { summary: 'One prospect with its timeline', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }) } }, patch: { summary: 'Edit a prospect', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }), 409: err } }, delete: { summary: 'Delete a prospect and its log', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }) } } },
       '/api/outreach/log': { post: { summary: 'Log an action (connect, accepted, msg, reply, meeting, won, … or a custom action) and move the prospect state', responses: { 201: ok({ type: 'object' }), 404: err } } },
       '/api/outreach/log/{id}': { delete: { summary: 'Undo a logged action; the prospect counters are rebuilt from the remaining log', parameters: [{ name: 'id', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }), 404: err } } },
+      '/api/outreach/export': { get: { summary: 'All Outreach data as tables (Prospects, Activity log, Daily numbers) for the Google Sheet backup; ?mark=1 records the backup time', responses: { 200: ok({ type: 'object' }) } } },
       '/api/outreach/import': { post: { summary: 'Bulk add prospects from CSV text {csv}', responses: { 200: ok({ type: 'object' }) } } },
       '/api/outreach/settings': { put: { summary: 'Outreach option lists, own accounts + limits, custom fields/actions, templates (owner/admin)', responses: { 200: ok({ type: 'object' }), 403: err } } },
       '/api/social/{business}/posts': { get: { summary: 'Social posts for the calendar (?from&to YYYY-MM-DD)', parameters: [{ name: 'business', in: 'path', required: true, schema: { type: 'string' } }], responses: { 200: ok({ type: 'object' }), 401: err } }, post: { summary: 'Create a post: action draft | schedule (scheduled_at ISO) | now; targets = connected account ids', parameters: [{ name: 'business', in: 'path', required: true, schema: { type: 'string' } }], responses: { 201: ok({ type: 'object' }), 400: err, 401: err } } },

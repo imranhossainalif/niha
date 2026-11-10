@@ -52,6 +52,23 @@ export function SettingsTab({ c, onSaved }: { c: Ctx; onSaved: (s: Settings) => 
     <div className="sm-grid">
       <div className="sm-card tint row"><span className="grow">Whatever you add here appears in the prospect form, the filters and the reports automatically. Press <b>Save</b> after changing anything.</span><button className="sm-btn primary" disabled={busy} onClick={save}>{busy ? 'Saving…' : 'Save'}</button></div>
 
+      <section className="sm-card stack"><h3>Google Sheet backup</h3>
+        {(() => { const b = c.backup; const h = b ? (Date.now() - Date.parse(b.at)) / 3600e3 : null; return b && h != null
+          ? <div className={'sm-warn' + (h > 26 ? ' err' : '')} style={h <= 3 ? { background: 'color-mix(in srgb, var(--good) 12%, transparent)', color: 'var(--good)', borderColor: 'transparent' } : undefined}>{h <= 3 ? '✓ ' : ''}Last backup {h < 1 ? Math.max(1, Math.round(h * 60)) + ' min' : h < 48 ? Math.round(h) + ' h' : Math.round(h / 24) + ' days'} ago · {b.prospects} prospects, {b.activities} activity rows{h > 26 ? ' — the hourly backup has stopped. Open script.google.com → Executions to see why.' : ''}</div>
+          : <div className="sm-warn">No backup has run yet. Do the one-time setup below.</div>; })()}
+        <span className="muted">Every hour all Outreach data (prospects, the full activity log, daily numbers) is copied into one Google Sheet in your Drive folder, plus a dated copy once a day (last 30 kept). It runs in your Google account — nothing to click after setup.</span>
+        <div className="row"><a className="sm-btn sm" href="https://drive.google.com/drive/folders/1Il6WKAGDrs2DMbwla2Kqc-msq0q_M1GJ" target="_blank" rel="noopener noreferrer">Open the Drive folder ↗</a><a className="sm-btn sm" href="https://script.google.com" target="_blank" rel="noopener noreferrer">Open Apps Script ↗</a></div>
+        <details><summary className="sm-t" style={{ cursor: 'pointer', fontWeight: 700 }}>One-time setup (3 minutes)</summary>
+          <ol className="steps">
+            <li>Open <b>script.google.com</b> and open your existing <b>Business OS</b> project (the one that sends the sales sheets).</li>
+            <li>Click <b>+</b> next to Files → <b>Script</b> → name it <code>outreach-backup</code>.</li>
+            <li>Paste the script your developer gave you (<code>deploy/outreach-backup.gs</code>) and press Save.</li>
+            <li>At the top choose the function <code>setupOutreachBackup</code> → <b>Run</b> → allow the permissions.</li>
+            <li>Done. The sheet <b>EasyFounder Outreach Backup</b> appears in the folder and this box turns green.</li>
+          </ol>
+        </details>
+      </section>
+
       <section className="sm-card stack"><h3>Our accounts (the IDs we do outreach from) and their daily limits</h3>
         <span className="muted xs">With limits set, the Dashboard shows a safety meter. LinkedIn and Instagram publish no official numbers — common guidance is 15–25 LinkedIn requests a day and about 100 a week. Set them to suit the age and health of each account.</span>
         {s.senders.map((x, i) => (

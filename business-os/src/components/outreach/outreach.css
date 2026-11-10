@@ -1,0 +1,27 @@
+/* Outreach CRM screens (inside .sm, see social.css for the shared tokens and buttons). */
+.or-tbl { width: 100%; border-collapse: collapse; font-size: 13px; }
+.or-tbl th { text-align: left; font: 700 11px var(--body); text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 8px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.or-tbl td { padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.or-tbl tr:last-child td { border-bottom: 0; }
+.or-tbl td.n, .or-tbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.or-tbl tbody tr.click { cursor: pointer; } .or-tbl tbody tr.click:hover { background: var(--soft); }
+.or-pf { display: inline-flex; align-items: center; gap: 5px; padding: 2px 8px; border-radius: 999px; font: 700 11.5px var(--body); color: #fff; white-space: nowrap; text-decoration: none; }
+.or-pf.off { opacity: .45; }
+.or-pill { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; font: 700 11.5px var(--body); background: var(--soft); color: var(--fg); white-space: nowrap; }
+.or-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(128px, 1fr)); gap: 10px; }
+.or-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; }
+.or-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 10px; }
+.or-form label, .or-f { display: grid; gap: 4px; font: 600 12px var(--body); color: var(--muted); }
+.or-kan { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(210px, 1fr); gap: 10px; overflow-x: auto; padding-bottom: 6px; }
+.or-col { background: var(--soft); border-radius: 12px; padding: 8px; display: grid; gap: 6px; align-content: start; min-height: 120px; }
+.or-kcard { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; cursor: pointer; display: grid; gap: 4px; }
+.or-kcard:hover { border-color: var(--accent); }
+.or-meter { height: 8px; border-radius: 99px; background: var(--soft); overflow: hidden; }
+.or-meter i { display: block; height: 100%; border-radius: 99px; background: var(--good); }
+.or-meter.warn i { background: var(--warn); } .or-meter.bad i { background: var(--bad); }
+.or-tl { display: grid; gap: 0; border-left: 2px solid var(--line); margin-left: 6px; }
+.or-tl > div { padding: 6px 0 6px 12px; position: relative; }
+.or-tl > div::before { content: ''; position: absolute; left: -6px; top: 12px; width: 10px; height: 10px; border-radius: 50%; background: var(--accent); border: 2px solid var(--panel); }
+.or-prof { border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: grid; gap: 8px; }
+.or-list { display: grid; gap: 6px; }
+.or-item { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--panel); }

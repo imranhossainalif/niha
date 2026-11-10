@@ -63,6 +63,15 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   direct post) log in through `/api/social/oauth/[provider]/start|callback`; tokens via `saveSecret('oauth:<account>')` (encrypted,
   never in docs), refreshed by `oauth.getAccess`. UI styles: `src/components/social/social.css` (scoped `.sm`, dashboard fonts/colours).
   `/legal/privacy` and `/legal/terms` exist because TikTok/Google ask for them.
+- **Outreach CRM (sidebar → Outreach, under Target & Goal):** native page `/outreach` (`src/components/outreach/*`, reuses the Social
+  `.sm` styles) in its own permanent frame (`OUTREACH_JS` in `patches.ts`). Manual-assisted social outreach tracking — it never sends
+  anything. Logic is pure and tested in `src/lib/outreach/core.ts`: a prospect has several `profiles` (platform, link, request sent /
+  accepted-follow back, message count, reply); every button is one row in `outreach_activities` and `applyActivity` moves the prospect
+  (Msg 1/2/3 numbering, stage only upward, "uttor baki"); `stats` (dashboard per platform/step/rep), `queues` (Aajker kaj), `groupBy`
+  (report by city/country/industry/size/role/…), `senderUsage` (our accounts' daily limits), duplicate check by normalised link.
+  Everything the team picks from (platforms, industries, stages, custom fields, custom action buttons, templates, our accounts, targets)
+  lives in `outreach_settings/main` and is edited in its Settings tab. All docs carry `business: 'lrf'` (the access bucket), the brand a
+  prospect is for is the `brand` field. Routes `/api/outreach/*`. The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
 - **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
   the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,
   BM25 lookup) and the most similar past customer→TEAM reply pairs (`learn.ts`, built from `inbox_messages`, phones scrubbed, 15 min cache).

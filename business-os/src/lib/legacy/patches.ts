@@ -42,6 +42,39 @@ function socialView(id) {
 }
 `;
 
+const OUTREACH_JS = String.raw`/* Business OS: sidebar → Outreach = the native /outreach page in ONE permanent frame (same idea as socialView). */
+function outreachView() {
+  const B = window.__bosOutreach || (window.__bosOutreach = (() => {
+    const host = document.createElement('div');
+    host.style.cssText = 'position:absolute;z-index:1;display:none';
+    const f = document.createElement('iframe');
+    f.title = 'Outreach'; f.style.cssText = 'width:100%;height:700px;border:0;display:block;background:transparent';
+    host.appendChild(f); document.body.appendChild(host);
+    const st = { host, f, on: false, ph: null, c: 0, d: 0 };
+    st.size = () => { const h = Math.max(500, st.c, st.d) + 'px'; f.style.height = h; if (st.ph) st.ph.style.height = h; };
+    window.addEventListener('message', (e) => {
+      if (e.origin !== location.origin || !e.data || e.source !== f.contentWindow) return;
+      if (e.data.bosSocialHeight) st.c = e.data.bosSocialHeight;
+      if (e.data.bosSocialDialog != null) st.d = e.data.bosSocialDialog;
+      st.size();
+      if (e.data.bosSocialFocus) host.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (e.data.bosSocialToast) toast(String(e.data.bosSocialToast));
+    });
+    setInterval(() => {
+      if (!st.ph || !document.body.contains(st.ph)) { host.style.display = 'none'; return; }
+      const r = st.ph.getBoundingClientRect();
+      host.style.display = 'block'; host.style.top = (r.top + window.scrollY) + 'px'; host.style.left = (r.left + window.scrollX) + 'px'; host.style.width = r.width + 'px';
+    }, 200);
+    return st;
+  })());
+  if (!B.on) { B.on = true; B.f.src = '/outreach?embed=1'; }
+  B.ph = el('div', { style: 'width:100%' }); B.size();
+  return [B.ph];
+}
+VIEWS.outreach = outreachView;
+TITLES.outreach = ['Outreach', 'Social media outreach: kake kobe kothay reach kora hoyeche, reply, stage, follow-up'];
+`;
+
 export type Patch = { name: string; find: string; replace: string };
 
 export const PATCHES: Patch[] = [
@@ -154,6 +187,16 @@ export const PATCHES: Patch[] = [
     name: 'Social Media tab: code',
     find: 'function bizCalendar(id) {',
     replace: SOCIAL_JS + 'function bizCalendar(id) {',
+  },
+  {
+    name: 'Outreach CRM: sidebar button under Target & Goal',
+    find: 'Target & Goal</button>',
+    replace: 'Target & Goal</button>\n      <button class="nav" data-go="outreach"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2L7 9M14 2l-4.5 12L7 9 2 6.5z"/></svg>Outreach</button>',
+  },
+  {
+    name: 'Outreach CRM: view (native page in a frame)',
+    find: 'VIEWS.recovery = () => {',
+    replace: OUTREACH_JS + 'VIEWS.recovery = () => {',
   },
   {
     name: 'Brand: EasyFounder (tab title)',

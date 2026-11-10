@@ -67,6 +67,7 @@ export function SettingsTab({ c, onSaved }: { c: Ctx; onSaved: (s: Settings) => 
       </section>
 
       <section className="sm-card stack"><h3>Targets and rules</h3>
+        {s.goal?.clients ? <span className="sm-warn">A monthly goal is set, so the three per-day targets below are replaced by the ones worked out from it (Target &amp; Goal tab). They apply again if the goal is cleared.</span> : null}
         <div className="or-form">
           <Num label="Per rep per day: requests / follows" v={s.targets.connect} on={(n) => set({ targets: { ...s.targets, connect: n } })} />
           <Num label="Per rep per day: messages" v={s.targets.msg} on={(n) => set({ targets: { ...s.targets, msg: n } })} />

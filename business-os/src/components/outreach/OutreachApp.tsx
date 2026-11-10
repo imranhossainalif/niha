@@ -11,9 +11,11 @@ import type { Ctx, Data, LogExtra } from './shared';
 import { Dashboard, Pipeline, Prospects, Queue, Report } from './Views';
 import { AddProspect, ImportBox, ProspectView } from './ProspectModal';
 import { SettingsTab } from './SettingsTab';
+import { GoalTab, TasksTab, TipsTab, type Go } from './Goals';
+import { DEFAULT_GOAL, plan, suggestions, tasksFor } from '@/lib/outreach/plan';
 
-type Tab = 'dash' | 'queue' | 'list' | 'pipe' | 'report' | 'settings';
-const TABS: [Tab, string, string][] = [['dash', 'Dashboard', 'chart'], ['queue', 'Today', 'check'], ['list', 'Prospects', 'users'], ['pipe', 'Pipeline', 'list'], ['report', 'Reports', 'chart'], ['settings', 'Settings', 'spark']];
+type Tab = 'dash' | 'queue' | 'tasks' | 'goal' | 'list' | 'pipe' | 'report' | 'tips' | 'settings';
+const TABS: [Tab, string, string][] = [['dash', 'Dashboard', 'chart'], ['goal', 'Target & Goal', 'spark'], ['tasks', 'Tasks', 'check'], ['queue', 'Today', 'clock'], ['list', 'Prospects', 'users'], ['pipe', 'Pipeline', 'list'], ['report', 'Reports', 'chart'], ['tips', 'Suggestions', 'spark'], ['settings', 'Settings', 'list']];
 
 export function OutreachApp({ embed }: { embed?: boolean }) {
   const [mounted, setMounted] = useState(false);
@@ -69,7 +71,14 @@ function App() {
     for (const id of ids) { const cur = data.prospects.find((x) => x.id === id); if (!cur) continue; const body = patch.tags ? { tags: [...new Set([...(cur.tags || []), ...patch.tags])] } : patch; try { const r = await api<{ prospect: Prospect }>('/api/outreach/prospects/' + id, { method: 'PATCH', json: body }); put(r.prospect); ok++; } catch { /* counted below */ } }
     toast(ok + ' updated' + (ok < ids.length ? ' · ' + (ids.length - ok) + ' failed' : ''), ok < ids.length ? 'err' : 'ok');
   };
-  const c: Ctx = { ...data, log, open: (p) => setOpenId(p.id || null), reload: load };
+  // Goal → plan. With a goal set, the per-rep daily targets everywhere (Dashboard team table) come from it instead of the fixed numbers in Settings.
+  const raw = data.settings;
+  const pl = plan(raw.goal || DEFAULT_GOAL, data.prospects, data.activities, data.today, raw);
+  const settings: Settings = pl.active ? { ...raw, targets: { connect: Math.max(1, pl.perRep.connect), msg: Math.max(1, pl.perRep.msg), touch: Math.max(1, pl.perRep.touch) } } : raw;
+  const c: Ctx = { ...data, settings, log, open: (p) => setOpenId(p.id || null), reload: load };
+  const go: Go = (t, flt) => { if (flt) setF(flt); setTab(t); };
+  const openTasks = tasksFor(pl, data.prospects, data.activities, data.today, raw, data.me).filter((t) => (t.kind === 'clear' ? t.target > 0 : t.done < t.target)).length;
+  const fixNow = suggestions(pl, data.prospects, data.activities, data.today, raw).filter((t) => t.tone === 'bad').length;
   const waiting = data.prospects.filter((p) => p.awaiting).length;
 
   return (
@@ -81,15 +90,18 @@ function App() {
         <button className="sm-btn primary" onClick={() => setAdding(true)} style={{ height: 40, padding: '0 18px', fontSize: 14.5 }}><Icon name="plus" />Add prospect</button>
       </header>
       <nav className="sm-seg" role="tablist" style={{ justifySelf: 'start' }}>
-        {TABS.map(([k, l, ic]) => <button key={k} type="button" role="tab" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}><Icon name={ic} size={15} />{l}{k === 'queue' && waiting ? <span className="sm-badge" style={{ marginLeft: 4, background: 'var(--bad)', color: '#fff' }}>{waiting}</span> : null}</button>)}
+        {TABS.map(([k, l, ic]) => <button key={k} type="button" role="tab" aria-selected={tab === k} aria-pressed={tab === k} onClick={() => setTab(k)}><Icon name={ic} size={15} />{l}{k === 'queue' && waiting ? <span className="sm-badge" style={{ marginLeft: 4, background: 'var(--bad)', color: '#fff' }}>{waiting}</span> : null}{k === 'tasks' && openTasks ? <span className="sm-badge" style={{ marginLeft: 4 }}>{openTasks}</span> : null}{k === 'tips' && fixNow ? <span className="sm-badge" style={{ marginLeft: 4, background: 'var(--bad)', color: '#fff' }}>{fixNow}</span> : null}</button>)}
       </nav>
       <div key={tab} className="sm-fade">
         {tab === 'dash' && <Dashboard c={c} goto={(t, flt) => { if (flt) setF(flt); setTab(t); }} />}
         {tab === 'queue' && <Queue c={c} />}
+        {tab === 'goal' && <GoalTab c={c} pl={pl} raw={raw} go={go} onSaved={(s: Settings) => setData((d) => (d ? { ...d, settings: s } : d))} />}
+        {tab === 'tasks' && <TasksTab c={c} pl={pl} go={go} />}
+        {tab === 'tips' && <TipsTab c={c} pl={pl} go={go} />}
         {tab === 'list' && <Prospects c={c} f={f} setF={setF} onAdd={() => setAdding(true)} onImport={() => setImporting(true)} bulk={bulk} />}
         {tab === 'pipe' && <Pipeline c={c} f={f} setF={setF} move={move} />}
         {tab === 'report' && <Report c={c} f={f} setF={setF} />}
-        {tab === 'settings' && <SettingsTab c={c} onSaved={(s: Settings) => setData((d) => (d ? { ...d, settings: s } : d))} />}
+        {tab === 'settings' && <SettingsTab c={{ ...c, settings: raw }} onSaved={(s: Settings) => setData((d) => (d ? { ...d, settings: s } : d))} />}
       </div>
       {adding && <AddProspect c={c} onClose={() => setAdding(false)} onSaved={(p) => { put(p); setAdding(false); setOpenId(p.id || null); }} />}
       {importing && <ImportBox onClose={() => setImporting(false)} onDone={() => { setImporting(false); load(); setTab('list'); }} />}

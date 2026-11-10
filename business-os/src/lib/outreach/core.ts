@@ -12,6 +12,7 @@ export type Settings = {
   stages: Opt[]; reply_statuses: Opt[]; sales_stages: Opt[]; lost_reasons: string[];
   senders: Sender[]; fields: CustomField[]; actions: CustomAction[]; templates: { id: string; label: string; text: string }[];
   targets: { connect: number; msg: number; touch: number };
+  goal?: { clients: number; workdays: number[] }; // monthly goal; targets and tasks are worked out from it (plan.ts)
   followup_days: number; max_steps: number; pending_days: number; cooling_days: number;
 };
 export type Profile = { platform: string; url: string; handle?: string; last_tpl?: string; out?: string | null; back?: string | null; connected?: boolean; msgs?: number; last_msg?: string | null; replied?: string | null; replies?: number };
@@ -80,6 +81,7 @@ function clean(saved: Partial<Settings>): Partial<Settings> {
   if (Array.isArray(saved.fields)) o.fields = saved.fields.filter((x) => x && txt(x.id) && txt(x.label)).slice(0, 40).map((x) => ({ id: txt(x.id, 40), label: txt(x.label, 60), type: (['text', 'number', 'select', 'date', 'link', 'check'] as const).includes(x.type) ? x.type : 'text', options: Array.isArray(x.options) ? x.options.map((t) => txt(t, 60)).filter(Boolean).slice(0, 60) : undefined })); else delete o.fields;
   if (Array.isArray(saved.actions)) o.actions = saved.actions.filter((x) => x && txt(x.id) && txt(x.label)).slice(0, 40).map((x) => ({ id: txt(x.id, 40), label: txt(x.label, 60), kind: (['touch', 'msg', 'none'] as const).includes(x.kind) ? x.kind : 'touch' })); else delete o.actions;
   if (Array.isArray(saved.templates)) o.templates = saved.templates.filter((x) => x && txt(x.id) && txt(x.label)).slice(0, 80).map((x) => ({ id: txt(x.id, 40), label: txt(x.label, 80), text: txt(x.text, 3000) })); else delete o.templates;
+  if (saved.goal && typeof saved.goal === 'object') o.goal = { clients: Math.min(500, Math.max(0, Math.round(Number(saved.goal.clients) || 0))), workdays: Array.isArray(saved.goal.workdays) ? [...new Set(saved.goal.workdays.map(Number).filter((d) => d >= 0 && d <= 6))] : [1, 2, 3, 4, 5] }; else delete o.goal;
   return o as Partial<Settings>;
 }
 export function mergeSettings(saved: Partial<Settings> | null | undefined): Settings {

@@ -121,7 +121,7 @@ export function Dashboard({ c, goto }: { c: Ctx; goto: (tab: 'queue' | 'list' | 
               <td><div className={'or-meter' + (r >= 1 ? '' : r >= 0.6 ? ' warn' : ' bad')}><i style={{ width: Math.min(100, r * 100) + '%' }} /></div><span className="muted xs">{x.touch} / {goal}</span></td>
               <td className="n">{x.connect}<span className="muted xs"> / {s.targets.connect * days}</span></td><td className="n">{x.msg}<span className="muted xs"> / {s.targets.msg * days}</span></td><td className="n">{x.touch}</td><td className="n">{x.reply}</td><td className="n">{rate(x.reply, x.msg)}</td><td className="n">{x.meeting}</td></tr>); })}</tbody></table></div>
           : <p className="muted">Nothing yet.</p>}
-        <p className="muted xs">Grey numbers are the target for this period ({s.targets.connect} requests, {s.targets.msg} messages, {s.targets.touch} touches per rep per day). Change them in Settings.</p>
+        <p className="muted xs">Grey numbers are the target for this period ({s.targets.connect} requests, {s.targets.msg} messages, {s.targets.touch} touches per rep per day). {s.goal?.clients ? 'They are worked out from the monthly goal (Target & Goal tab).' : 'Change them in Settings, or set a monthly goal and they are worked out for you.'}</p>
       </section>
 
       <div className="sm-grid" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(min(340px, 100%), 1fr))' }}>

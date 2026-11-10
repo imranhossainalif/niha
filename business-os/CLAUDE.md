@@ -83,7 +83,12 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   Everything the team picks from (platforms, industries, stages, custom fields, custom action buttons, templates, our accounts, targets)
   lives in `outreach_settings/main` and is edited in its Settings tab. All docs carry `business: 'lrf'` (the access bucket), the brand a
   prospect is for is the `brand` field. Routes `/api/outreach/*`. **This tab is in English** (owner request) — the rest of the dashboard stays Banglish.
-  Charts are inline SVG (`Charts.tsx`). The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
+  Charts are inline SVG (`Charts.tsx`). Three calculated tabs (`Goals.tsx`, logic in `src/lib/outreach/plan.ts`, tested): **Target & Goal** — the owner saves one
+  number (`settings.goal.clients` + workdays) and `plan()` divides it back through the funnel (own conversion rates once the sample is big enough, else the stated
+  `BENCH` assumptions) into monthly needs, pace and a catch-up target per remaining workday, which also replaces the per-rep targets on the Dashboard;
+  **Tasks** — `tasksFor()` builds today's list (queues to clear + goal numbers) and ticks it off from the log, nothing is stored;
+  **Suggestions** — `suggestions()` is a rule engine over the last 30 days (accept/reply rate per platform, message step, templates, warm vs cold first message,
+  reply types, lead type, speed, account safety, goal pace, plan checkpoints); every tip has a FACT line and a HYPOTHESIS line. No AI call is involved. The older LRF → Outreach tab (`outreach_daily` counts) is unchanged.
 - **Inbox AI knowledge:** besides the compiled products/offers/delivery/FAQ (`compile.ts`), each reply also gets (`context.ts`)
   the closest passages of our website (`web.ts`: sitemap/links crawl of `WEBSITE_URL` → `inbox_web`, job `inbox_web_sync` daily 06:30,
   BM25 lookup) and the most similar past customer→TEAM reply pairs (`learn.ts`, built from `inbox_messages`, phones scrubbed, 15 min cache).

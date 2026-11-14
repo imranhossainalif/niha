@@ -56,7 +56,7 @@ export async function socialToken(): Promise<string> {
 }
 
 /* ---------- one-click connect: Facebook Login (OAuth) ---------- */
-export const META_SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights', 'business_management', 'ads_read'];
+export const META_SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'pages_read_user_content', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights', 'business_management', 'ads_read'];
 
 /** Facebook Login dialog URL: the user just logs in and approves — no token to copy or paste. */
 export function metaAuthUrl(appId: string, redirect: string, state: string): string {
@@ -181,23 +181,32 @@ export async function publishFacebook(pageId: string, input: PublishInput, user:
   const token = await pageToken(pageId, user, f);
   const { text, media, link } = input;
   let id: string;
+  // `published`/`no_story` are sent explicitly: Meta's Page photo/video uploads do not always generate the feed story
+  // on their own (a `/photos` upload can land only in the album/Photos tab), and the API defaults have changed before.
+  // published=true + no_story=false is the documented way to get the post into the Page's main feed as well.
   if (media.length === 1 && isVideo(media[0])) {
-    const j = await graph('/' + pageId + '/videos', { token, method: 'POST', f, base: 'https://graph-video.facebook.com/v21.0', params: { file_url: media[0].url, description: text } });
+    // Since Aug 2025 Meta treats uploaded Page videos as Reels; the feed story is the `no_story=false` part.
+    const j = await graph('/' + pageId + '/videos', { token, method: 'POST', f, base: 'https://graph-video.facebook.com/v21.0', params: { file_url: media[0].url, description: text, published: 'true', no_story: 'false' } });
     id = j.post_id || j.id;
   } else if (media.length === 1) {
-    const j = await graph('/' + pageId + '/photos', { token, method: 'POST', f, params: { url: media[0].url, caption: text } });
+    const j = await graph('/' + pageId + '/photos', { token, method: 'POST', f, params: { url: media[0].url, caption: text, published: 'true', no_story: 'false' } });
     id = j.post_id || j.id;
   } else if (media.length > 1) {
     if (media.some(isVideo)) throw new GraphError('Facebook e ek post e onek video/photo+video eksathe deya jay na — ekta video ba shudhu photo din');
     const ids: string[] = [];
     for (const m of media) ids.push((await graph('/' + pageId + '/photos', { token, method: 'POST', f, params: { url: m.url, published: 'false' } })).id);
-    id = (await graph('/' + pageId + '/feed', { token, method: 'POST', f, params: { message: text, attached_media: ids.map((x) => ({ media_fbid: x })) } })).id;
+    // The album is only the container: the visible post is this `/feed` write with every photo attached.
+    // Graph expects attached_media as indexed form fields (attached_media[0], attached_media[1], …).
+    const attached: Record<string, string> = {};
+    ids.forEach((x, i) => { attached['attached_media[' + i + ']'] = JSON.stringify({ media_fbid: x }); });
+    id = (await graph('/' + pageId + '/feed', { token, method: 'POST', f, params: { message: text, published: 'true', ...attached } })).id;
   } else {
     if (!text && !link) throw new GraphError('Lekha ba link lagbe');
-    id = (await graph('/' + pageId + '/feed', { token, method: 'POST', f, params: { message: text, link } })).id;
+    id = (await graph('/' + pageId + '/feed', { token, method: 'POST', f, params: { message: text, link, published: 'true' } })).id;
   }
   const p = await graph('/' + id, { token, f, params: { fields: 'permalink_url' } }).catch(() => ({}));
-  return { ext_post_id: id, permalink: p.permalink_url };
+  // Fallback: a post id alone is a valid facebook.com URL (also works for photo/Reel ids).
+  return { ext_post_id: id, permalink: p.permalink_url || 'https://www.facebook.com/' + id };
 }
 
 async function waitContainer(id: string, token: string, f?: Fetch, tries = 40) {

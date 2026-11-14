@@ -49,6 +49,7 @@ function fakeGraph() {
     if (params.fields === 'access_token') return ok({ access_token: 'PAGE_TOKEN' });
     if (params.fields === 'status_code,status') return ok({ status_code: 'FINISHED' });
     if (params.fields === 'permalink_url' || params.fields === 'permalink') return ok({ permalink_url: 'https://fb/p', permalink: 'https://ig/p' });
+    if (path.endsWith('/videos')) return ok({ id: 'video' + ++n, post_id: 'video_post' + n });
     if (path.endsWith('/photos')) return ok({ id: 'photo' + ++n, post_id: params.published === 'false' ? undefined : 'page_post' + n });
     if (path.endsWith('/feed')) return ok({ id: 'feed_post' });
     if (path.endsWith('/media_publish')) return ok({ id: 'ig_post' });
@@ -59,13 +60,14 @@ function fakeGraph() {
 }
 
 describe('Meta one-click connect (mocked)', () => {
-  it('login URL points at the Facebook dialog with the posting scopes', () => {
+  it('login URL points at the Facebook dialog with the posting scopes (and feed-read for placement checks)', () => {
     const u = new URL(metaAuthUrl('APP1', 'https://os.example/api/social/oauth/meta/callback', 'st8'));
     expect(u.origin + u.pathname).toBe('https://www.facebook.com/v21.0/dialog/oauth');
     expect(u.searchParams.get('client_id')).toBe('APP1');
     expect(u.searchParams.get('redirect_uri')).toContain('/api/social/oauth/meta/callback');
     expect(u.searchParams.get('scope')).toContain('pages_manage_posts');
     expect(u.searchParams.get('scope')).toContain('instagram_content_publish');
+    expect(u.searchParams.get('scope')).toContain('pages_read_user_content');
   });
   it('code exchange upgrades the short token to a long-lived one', async () => {
     const grants: (string | null)[] = [];
@@ -83,19 +85,39 @@ describe('Meta one-click connect (mocked)', () => {
 });
 
 describe('publishing (mocked Meta)', () => {
-  it('Facebook: one photo goes to /photos with the page token', async () => {
+  it('Facebook: one photo goes to /photos published for the feed (no_story off)', async () => {
     const g = fakeGraph();
     const r = await publishFacebook('PAGE1', { text: 'Hi', media: [{ url: 'https://x/a.jpg', mime: 'image/jpeg' }] }, 'USER', g.f);
     expect(r.ext_post_id).toMatch(/^page_post/);
     const photo = g.calls.find((c) => c.path === '/PAGE1/photos')!;
-    expect(photo.params).toMatchObject({ url: 'https://x/a.jpg', caption: 'Hi', access_token: 'PAGE_TOKEN' });
+    expect(photo.params).toMatchObject({ url: 'https://x/a.jpg', caption: 'Hi', published: 'true', no_story: 'false', access_token: 'PAGE_TOKEN' });
   });
-  it('Facebook: several photos are uploaded unpublished, then one feed post', async () => {
+  it('Facebook: one video goes to /videos published for the feed (no_story off)', async () => {
+    const g = fakeGraph();
+    const r = await publishFacebook('PAGE11', { text: 'Reel?', media: [{ url: 'https://x/v.mp4', mime: 'video/mp4' }] }, 'USER', g.f);
+    expect(r.ext_post_id).toBeTruthy();
+    const video = g.calls.find((c) => c.path === '/PAGE11/videos')!;
+    expect(video.params).toMatchObject({ file_url: 'https://x/v.mp4', description: 'Reel?', published: 'true', no_story: 'false' });
+  });
+  it('Facebook: several photos are uploaded unpublished, then one visible feed post with attached_media', async () => {
     const g = fakeGraph();
     await publishFacebook('PAGE2', { text: 'Album', media: [{ url: 'https://x/1.jpg', mime: 'image/jpeg' }, { url: 'https://x/2.jpg', mime: 'image/jpeg' }] }, 'USER', g.f);
     expect(g.calls.filter((c) => c.path === '/PAGE2/photos' && c.params.published === 'false')).toHaveLength(2);
     const feed = g.calls.find((c) => c.path === '/PAGE2/feed')!;
-    expect(JSON.parse(feed.params.attached_media)).toHaveLength(2);
+    expect(feed.params.published).toBe('true');
+    expect(JSON.parse(feed.params['attached_media[0]'])).toEqual({ media_fbid: 'photo1' });
+    expect(JSON.parse(feed.params['attached_media[1]'])).toEqual({ media_fbid: 'photo2' });
+  });
+  it('Facebook: a feed post without a Graph permalink still gets a usable facebook.com link', async () => {
+    const f = (async (input: string | URL, init?: RequestInit) => {
+      const u = new URL(String(input));
+      const params = Object.fromEntries(init?.method === 'POST' ? new URLSearchParams(String(init.body)) : u.searchParams);
+      if (params.fields === 'access_token') return new Response(JSON.stringify({ access_token: 'PAGE_TOKEN' }), { status: 200 });
+      if (u.pathname.endsWith('/feed')) return new Response(JSON.stringify({ id: 'page_999_1' }), { status: 200 });
+      return new Response(JSON.stringify({}), { status: 200 }); // no permalink_url
+    }) as Fetch;
+    const r = await publishFacebook('PAGE12', { text: 'hello', media: [] }, 'USER', f);
+    expect(r).toEqual({ ext_post_id: 'page_999_1', permalink: 'https://www.facebook.com/page_999_1' });
   });
   it('Instagram: carousel = item containers + carousel container + publish', async () => {
     const g = fakeGraph();

@@ -3,7 +3,7 @@ import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { applyPatches, legacyDocument, PATCHES } from '@/lib/legacy/patches';
 import { htmlToText } from '@/lib/web/extract';
-import { docBusiness, LEGACY_COLS } from '@/lib/business';
+import { BIZ, docBusiness, LEGACY_COLS } from '@/lib/business';
 
 const legacy = fs.readFileSync(path.join(__dirname, '..', 'legacy', 'business-os.html'), 'utf8');
 
@@ -17,6 +17,13 @@ describe('legacy page', () => {
   });
   it('a patch that no longer matches fails loudly', () => {
     expect(() => applyPatches('nothing here')).toThrow(/matched 0 times/);
+  });
+  it('the MatroKotha rename keeps the hajj id and changes only display text', () => {
+    const out = legacyDocument(legacy);
+    expect(BIZ.find((b) => b.id === 'hajj')?.name).toBe('MatroKotha');
+    expect(out).toContain(`{ id: 'hajj', name: 'MatroKotha', color: '#7C3AED' }`);
+    expect(out).toContain('>MatroKotha</button>');
+    expect(out).not.toContain('Hajj/Umrah + Real Estate');
   });
   it('LEGACY_COLS matches the COLS list in the legacy file', () => {
     const m = legacy.match(/const COLS = (\[[^\]]+\]);/);

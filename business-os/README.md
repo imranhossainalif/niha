@@ -1,6 +1,6 @@
 # Business OS
 
-Self-hosted CRM / business operating system for Imran's businesses (Kids Care BD, Insafia, LRF, Itevs, Hajj/Umrah, …).
+Self-hosted CRM / business operating system for Imran's businesses (Kids Care BD, Insafia, LRF, Itevs, MatroKotha, …).
 Next.js + PostgreSQL + a background worker. Everything from the old claude.ai dashboard works here, plus the native
 Messenger inbox (InboxPilot), the Nuport and Google Sheets syncs, an API for Claude, and nightly backups.
 

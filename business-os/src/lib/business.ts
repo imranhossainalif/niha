@@ -6,7 +6,7 @@ export const BIZ = [
   { id: 'localservicehq', name: 'LocalServiceHQ', color: '#16A34A' },
   { id: 'personalbrand', name: 'Imran Hossain Alif', color: '#0891B2' },
   { id: 'itevs', name: 'Itevs Digital', color: '#1F6FB8' },
-  { id: 'hajj', name: 'Hajj/Umrah + Real Estate', color: '#7C3AED' },
+  { id: 'hajj', name: 'MatroKotha', color: '#7C3AED' },
   { id: 'others', name: 'Onnanno', color: '#5F7A74' },
   { id: 'personal', name: 'Personal', color: '#6A4FC4' },
 ] as const;

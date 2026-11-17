@@ -348,3 +348,35 @@ PATCHES.push(
   },
 );
 
+/* ===== MatroKotha rename (owner request 2026-11-17). The "Hajj/Umrah + Real Estate" business is now
+   called "MatroKotha" in the UI. The id stays 'hajj' — every existing doc (tasks, money pages, settings)
+   keeps working; only the display text in business.ts and the legacy page changes. No tab or option is
+   removed. ===== */
+PATCHES.push(
+  {
+    name: 'MatroKotha: business name in the legacy BIZ list',
+    find: `  { id: 'hajj', name: 'Hajj/Umrah + Real Estate', color: '#7C3AED' },`,
+    replace: `  { id: 'hajj', name: 'MatroKotha', color: '#7C3AED' },`,
+  },
+  {
+    name: 'MatroKotha: sidebar item label',
+    find: `data-go="biz:hajj"><svg viewBox="0 0 16 16" fill="#A78BFA"><circle cx="8" cy="8" r="4"/></svg>Hajj/Umrah + RE</button>`,
+    replace: `data-go="biz:hajj"><svg viewBox="0 0 16 16" fill="#A78BFA"><circle cx="8" cy="8" r="4"/></svg>MatroKotha</button>`,
+  },
+  {
+    name: 'MatroKotha: Recovery 90 group label',
+    find: `['hajj', 'Hajj/Umrah + Real Estate']`,
+    replace: `['hajj', 'MatroKotha']`,
+  },
+  {
+    name: 'MatroKotha: Recovery 90 task list label',
+    find: `['hajj', 'Hajj/Umrah + Real Estate', `,
+    replace: `['hajj', 'MatroKotha', `,
+  },
+  {
+    name: 'MatroKotha: intro note wording',
+    find: `Freeze 12 Jan porjonto: VidioBite, SaaSplainer, Real estate, Hajj/Umrah (shudhu baba-r referral).`,
+    replace: `Freeze 12 Jan porjonto: VidioBite, SaaSplainer, Real estate, MatroKotha (shudhu baba-r referral).`,
+  },
+);
+

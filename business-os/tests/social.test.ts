@@ -67,7 +67,9 @@ describe('Meta one-click connect (mocked)', () => {
     expect(u.searchParams.get('redirect_uri')).toContain('/api/social/oauth/meta/callback');
     expect(u.searchParams.get('scope')).toContain('pages_manage_posts');
     expect(u.searchParams.get('scope')).toContain('instagram_content_publish');
-    expect(u.searchParams.get('scope')).toContain('pages_read_user_content');
+    // pages_read_user_content is NOT requested: the app is not approved for it and Facebook rejects the whole
+    // login with "Invalid Scopes" (it blocked connect on 2026-11-17). Add it only after an App Review.
+    expect(u.searchParams.get('scope')).not.toContain('pages_read_user_content');
   });
   it('code exchange upgrades the short token to a long-lived one', async () => {
     const grants: (string | null)[] = [];

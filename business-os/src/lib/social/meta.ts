@@ -56,7 +56,10 @@ export async function socialToken(): Promise<string> {
 }
 
 /* ---------- one-click connect: Facebook Login (OAuth) ---------- */
-export const META_SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'pages_read_user_content', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights', 'business_management', 'ads_read'];
+// Only permissions this Meta app is approved for. Adding `pages_read_user_content` (feed-placement reading)
+// made Facebook Login fail with "Invalid Scopes: pages_read_user_content" and blocked every connect — it needs
+// an App Review first. Do not add it back until the permission is approved for the app.
+export const META_SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement', 'read_insights', 'instagram_basic', 'instagram_content_publish', 'instagram_manage_insights', 'business_management', 'ads_read'];
 
 /** Facebook Login dialog URL: the user just logs in and approves — no token to copy or paste. */
 export function metaAuthUrl(appId: string, redirect: string, state: string): string {

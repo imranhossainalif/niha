@@ -1,6 +1,6 @@
 'use client';
 // Connect accounts: Facebook + Instagram (one-click Facebook login, or the Meta system-user token),
-// YouTube (Google login), TikTok (TikTok login), Pinterest and LinkedIn (their own logins).
+// YouTube (Google login), TikTok (TikTok login), Pinterest, LinkedIn and X/Twitter (their own logins).
 // Each card shows what is connected and the one-time setup.
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
@@ -8,7 +8,7 @@ import { api, Avatar, compact, Modal, useToast, type Account } from './ui';
 import { bizName } from '@/lib/business';
 
 type Found = { network: 'facebook' | 'instagram'; ext_id: string; name: string; username?: string; picture?: string; followers?: number; page_id?: string };
-type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean; pinterest: boolean; linkedin: boolean };
+type Prov = { meta: boolean; metaApp: boolean; metaUser: boolean; youtube: boolean; tiktok: boolean; pinterest: boolean; linkedin: boolean; twitter: boolean };
 const DESC: Record<Net, string> = {
   facebook: 'Page e post (chobi, album, video, link) · reach, react, comment, share',
   instagram: 'Chobi, Reel, Carousel · reach, like, save · competitor research',
@@ -16,6 +16,7 @@ const DESC: Record<Net, string> = {
   tiktok: 'Video post ba TikTok app e draft · view, like, comment, share',
   pinterest: 'Chobi pin board e · impression, save, click',
   linkedin: 'Nijer profile e text, chobi, video post (company Page na) · token ~60 din',
+  twitter: 'Nijer X (Twitter) account e text post · ekhon text only (chobi/video pore)',
 };
 
 export function Accounts({ business, accounts, canAdmin, onChange }: { business: string; accounts: Account[]; canAdmin: boolean; onChange: () => void }) {
@@ -42,7 +43,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
     catch (e) { toast((e as Error).message, 'err'); }
     setBusy('');
   };
-  const oauth = (p: 'youtube' | 'tiktok' | 'meta' | 'pinterest' | 'linkedin') => {
+  const oauth = (p: 'youtube' | 'tiktok' | 'meta' | 'pinterest' | 'linkedin' | 'twitter') => {
     const w = window.open(`/api/social/oauth/${p}/start?business=${business}`, 'bos-oauth', 'width=540,height=760');
     if (!w) toast('Popup bondho — browser e popup allow korun', 'err');
   };
@@ -84,6 +85,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
   const ttBtn = prov?.tiktok ? <button className="sm-btn primary" onClick={() => oauth('tiktok')}><NetLogo net="tiktok" size={16} />TikTok diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "TikTok setup" korun (TikTok client key lagbe).</span>;
   const pinBtn = prov?.pinterest ? <button className="sm-btn primary" onClick={() => oauth('pinterest')}><NetLogo net="pinterest" size={16} />Pinterest diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "Pinterest setup" korun (Pinterest App ID lagbe).</span>;
   const liBtn = prov?.linkedin ? <button className="sm-btn primary" onClick={() => oauth('linkedin')}><NetLogo net="linkedin" size={16} />LinkedIn diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "LinkedIn setup" korun (LinkedIn Client ID lagbe).</span>;
+  const twBtn = prov?.twitter ? <button className="sm-btn primary" onClick={() => oauth('twitter')}><NetLogo net="twitter" size={16} />X diye connect</button> : <span className="sm-warn"><Icon name="alert" />Age nicher "X (Twitter) setup" korun (X OAuth 2.0 Client ID lagbe).</span>;
 
   return (
     <div className="stack" style={{ gap: 14 }}>
@@ -94,6 +96,7 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
         {card('tiktok', ttBtn)}
         {card('pinterest', pinBtn)}
         {card('linkedin', liBtn)}
+        {card('twitter', twBtn)}
       </div>
 
       <section className="sm-card stack">
@@ -131,6 +134,14 @@ export function Accounts({ business, accounts, canAdmin, onChange }: { business:
           <li><b>App ID</b> ar <b>App secret</b> → Dashboard → Settings → <i>Pinterest</i> → Save → upore <b>"Pinterest diye connect"</b>.</li>
           <li>Connect er shomoy account er shob board save hoy — post korar shomoy pin account er <b>prothom board</b> e jabe (Composer theke board bodlano jay). Pinterest e age theke board na thakle ekta baniye nin.</li>
           <li><b>Jene rakhun:</b> notun app prothome <b>Trial access</b> e thake — tokhon pin shudhu ekta private sandbox board e jay, public e na. Public pin er jonno app er page theke <b>Standard access</b> er apply korun (Pinterest review kore, kichu din lage). Ekhon shudhu <b>chobi pin</b> supported — video pin pore asbe.</li>
+        </Guide>
+        <Guide net="twitter" title="X (Twitter) setup">
+          <li><a className="lnk" href="https://developer.x.com/" target="_blank" rel="noreferrer">developer.x.com</a> e login → <i>Developer Portal</i> → <b>Projects &amp; Apps</b> → app create (ba existing app) → Project e app add korun.</li>
+          <li>App → <i>User authentication settings</i> → <b>Set up</b>: OAuth 2.0 <b>on</b>, App type <b>Web App</b>, Callback URI: <CopyCode text={cb + 'twitter/callback'} />, Website URL: <CopyCode text={cb.split('/api/')[0] || ''} />, scopes: <code>tweet.read</code> <code>tweet.write</code> <code>users.read</code> <code>offline.access</code> → Save.</li>
+          <li>App → <i>Keys and tokens</i> → <b>OAuth 2.0 Client ID</b> ar <b>Client Secret</b> copy korun.</li>
+          <li>Dashboard → Settings → <i>X (Twitter)</i> → Client ID ar Client Secret boshan → Save.</li>
+          <li>Upore <b>"X diye connect"</b> → X login → <b>Authorize app</b> → connect hoye jabe.</li>
+          <li><b>Jene rakhun:</b> X API te posting limit ache (plan onujayi; free tier e din e koyekta post). Ekhon shudhu <b>text post</b> supported — chobi/video X API er alada media endpoint + paid tier lage, pore asbe. Token ~2 ghonta thake, refresh token diye nijei refresh hoy.</li>
         </Guide>
         <Guide net="linkedin" title="LinkedIn setup">
           <li><a className="lnk" href="https://www.linkedin.com/developers/apps" target="_blank" rel="noreferrer">linkedin.com/developers</a> e <i>Create app</i>: naam <i>EasyFounder</i>, ekta LinkedIn Page er sathe associate korun (jemon Local Revenue Flow) — app verify korte hole Page er admin diye verify korun.</li>

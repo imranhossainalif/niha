@@ -65,7 +65,8 @@ Next.js 15 (App Router, route handlers, server actions) · TypeScript · Postgre
   Meta does not allow posting to Facebook groups by API: groups are suggestions only.
   YouTube (`src/lib/social/youtube.ts`, Google OAuth) and TikTok (`tiktok.ts`, TikTok OAuth, FILE_UPLOAD chunks, inbox draft or
   direct post) log in through `/api/social/oauth/[provider]/start|callback`; tokens via `saveSecret('oauth:<account>')` (encrypted,
-  never in docs), refreshed by `oauth.getAccess`. Pinterest (`pinterest.ts`, image pins) and LinkedIn (`linkedin.ts`, OIDC sign-in +
+  never in docs), refreshed by `oauth.getAccess`. X/Twitter (`twitter.ts`, OAuth 2.0 + PKCE, text posts only for now) uses the same
+  routes — its PKCE verifier rides in the `bos_oauth` state cookie. Pinterest (`pinterest.ts`, image pins) and LinkedIn (`linkedin.ts`, OIDC sign-in +
   Posts API) use the same routes; LinkedIn posts to the member's own profile (no company pages): text, link, 1–20 images (multiImage) or one video
   through LinkedIn's Images/Videos upload flow — a post with media never falls back to text only. Its ~60-day member token has no refresh token at this product tier — on expiry `getAccess` asks for a one-click reconnect.
   Reliability: `publishDue` (worker, every minute) also retries targets that failed only on a network blink (≤3 times, ≥4 min apart, within 24 h of the schedule),

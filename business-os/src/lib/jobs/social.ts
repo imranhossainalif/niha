@@ -12,6 +12,7 @@ import { channel, publishYouTube, youtubePosts, type YtOptions } from '../social
 import { profile, publishTikTok, tiktokPosts, type TtOptions } from '../social/tiktok';
 import { pinBoards, pinProfile, pinterestPosts, publishPinterest, type PinBoard } from '../social/pinterest';
 import { liProfile, publishLinkedIn } from '../social/linkedin';
+import { publishTwitter, twitterProfile } from '../social/twitter';
 import { facebookPosts, followers, igAudience, igCompetitor, instagramPosts, metaTokens, publishFacebook, publishInstagram, type Fetch, type Network, type PostStat } from '../social/meta';
 import { runAgent, type Tool } from '../ai/agent';
 import { anthropic, MODEL } from '../anthropic';
@@ -51,10 +52,16 @@ export async function publishPost(id: string, p: Principal = SYSTEM, f?: Fetch) 
       try {
         if (!a) throw new Error('Account ta ar connect nai');
         const input = { text: t.text ?? post.text, media: post.media.map((m) => ({ url: m.url, mime: m.mime })), link: post.link };
+        // X (Twitter) is text-only here: refuse media instead of publishing a half post.
+        const publishX = async () => {
+          if (post.media.length) throw new Error('X (Twitter) e ekhono chobi/video post jay na — text only (media bad diye post korun)');
+          return publishTwitter(await getAccess('twitter', a.id, f), input.text, a.username, f);
+        };
         const r: { ext_post_id: string; permalink?: string; note?: string } = a.network === 'facebook' ? await publishFacebook(a.ext_id, input, user, f)
           : a.network === 'instagram' ? await publishInstagram(a.ext_id, a.page_id, input, user, f)
           : a.network === 'pinterest' ? await publishPinterest(a, input, { board_id: post.options?.pin_board }, await getAccess('pinterest', a.id, f), f)
           : a.network === 'linkedin' ? await publishLinkedIn(a, input, await getAccess('linkedin', a.id, f), f, await Promise.all(post.media.map(async (m) => { const x = await mediaFile(m.id); return x ? { path: x.path, mime: x.mime, size: x.size } : undefined; })))
+          : a.network === 'twitter' ? await publishX()
           : await publishVideo(a.network, a.id, post, input.text, f);
         targets.push({ ...t, status: 'published', ext_post_id: r.ext_post_id, permalink: r.permalink, note: r.note, error: undefined, at: new Date().toISOString() });
       } catch (e) {
@@ -144,11 +151,13 @@ export async function socialSync(opts: { days?: number; f?: Fetch } = {}) {
   for (const a of list) {
     try {
       let posts: PostStat[], n: number | null;
-      if (a.network === 'youtube' || a.network === 'tiktok' || a.network === 'pinterest' || a.network === 'linkedin') {
+      if (a.network === 'youtube' || a.network === 'tiktok' || a.network === 'pinterest' || a.network === 'linkedin' || a.network === 'twitter') {
         const token = await getAccess(a.network, a.id, opts.f);
         if (a.network === 'youtube') { const c = await channel(token, opts.f); n = c.followers; posts = c.uploads ? await youtubePosts(a.ext_id, c.uploads, since, token, opts.f) : []; }
         else if (a.network === 'linkedin') { await liProfile(token, opts.f); n = null; posts = []; } // token check only: OIDC userinfo has no follower count, and reading posts back needs the restricted r_member_social scope
         else if (a.network === 'pinterest') { const pr = await pinProfile(token, opts.f); n = pr.followers; const boards = await pinBoards(token, opts.f).catch(() => a.boards ?? []); posts = await pinterestPosts(a.ext_id, boards, since, token, opts.f); }
+        else if (a.network === 'twitter') { const pr = await twitterProfile(token, opts.f); n = pr.followers; posts = []; } // token + followers only: reading tweets back needs extra X reads
+
         else { n = (await profile(token, opts.f)).followers; posts = await tiktokPosts(a.ext_id, since, token, opts.f); }
       } else {
         posts = a.network === 'facebook' ? await facebookPosts(a.ext_id, since, user, opts.f) : await instagramPosts(a.ext_id, a.page_id, since, user, opts.f);

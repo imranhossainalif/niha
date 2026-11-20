@@ -69,7 +69,7 @@ Businesses (`business-os/src/lib/business.ts` → `BIZ`, 9 entries): `kidscare` 
 | Extra legacy tab code | `src/lib/legacy/*.ts` (`salesLive.ts` = Sales Team, `attendance.ts`, `webTraffic.ts`, …) |
 | Native pages | `/` (home counts), `/admin`, `/settings`, `/social/[business]`, `/legal/*` |
 | InboxPilot (Messenger AI) | `src/lib/inbox/*`, webhook `src/app/api/meta/webhook/route.ts` |
-| Social media (Publer-like: Facebook, Instagram, YouTube, TikTok, LinkedIn, Pinterest) | `src/lib/social/*`, `src/components/social/*`, `src/app/social/[business]/page.tsx` |
+| Social media (Publer-like: Facebook, Instagram, YouTube, TikTok, LinkedIn, Pinterest, X/Twitter) | `src/lib/social/*`, `src/components/social/*`, `src/app/social/[business]/page.tsx` |
 | AI assistant (server-side) | `src/lib/ai/agent.ts` (`askAssistant`, `runAgent`) |
 | Calculations (tested) | `src/lib/calc/nuport.ts`, `pl.ts`, `engine.ts` |
 | Worker / scheduled jobs | `worker/index.ts`, `src/lib/jobs/runner.ts`, `src/lib/jobs/*` |

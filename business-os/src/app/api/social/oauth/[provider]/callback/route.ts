@@ -8,6 +8,7 @@ import { channel } from '@/lib/social/youtube';
 import { profile } from '@/lib/social/tiktok';
 import { pinBoards, pinProfile } from '@/lib/social/pinterest';
 import { liProfile } from '@/lib/social/linkedin';
+import { twitterProfile } from '@/lib/social/twitter';
 import { discoverAccounts, metaMe } from '@/lib/social/meta';
 import { cfg } from '@/lib/config';
 import { bizName } from '@/lib/business';
@@ -32,7 +33,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   const provider = (await params).provider as Provider;
   const u = new URL(req.url);
   const jar = await cookies();
-  let st: { state?: string; business?: string; provider?: string } = {};
+  let st: { state?: string; business?: string; provider?: string; verifier?: string } = {};
   try { st = JSON.parse(jar.get('bos_oauth')?.value || '{}'); } catch { /* bad cookie */ }
   jar.delete('bos_oauth');
   const p = await requestPrincipal(req);
@@ -42,7 +43,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
   const code = u.searchParams.get('code');
   if (!code) return page(false, 'Code pawa jayni.', st.business);
   try {
-    const t = await exchangeCode(provider, code, origin(req));
+    const t = await exchangeCode(provider, code, origin(req), st.verifier);
     if (provider === 'meta') {
       // One-click Facebook + Instagram: keep the long-lived user token as a shared secret (publishing/analytics
       // derive page tokens from it) and connect every Page / Instagram this login can manage to this business.
@@ -96,6 +97,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ provider
       await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'pinterest', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
         boards, board_id: boards[0]?.id || '', scope: t.scope, active: true, connected_at: new Date().toISOString(), error: '' });
       return page(true, 'Pinterest account "@' + info.username + '" connect hoyeche' + (boards.length ? ' (' + boards.length + ' ta board, prothom board "' + boards[0].name + '" e pin jabe)' : ' (kono board pawa jayni — Pinterest e ekta board banan)') + '. Ei window bondho korun.', st.business);
+    }
+    if (provider === 'twitter') {
+      // X (Twitter): the OAuth 2.0 user token is enough to post as this account; refresh token comes with
+      // offline.access. Text posts only for now.
+      const info = await twitterProfile(t.access_token);
+      const id = 'twitter_' + info.id;
+      const own = await heldElsewhere(p, id, st.business || 'kidscare'); if (own) return held(info.name, own.business);
+      await saveSecret('oauth:' + id, t);
+      await db(p).collection('social_accounts').doc(id).set({ business: st.business || 'kidscare', network: 'twitter', ext_id: info.id, page_id: '', name: info.name, username: info.username, picture: info.picture, followers: info.followers,
+        scope: t.scope, token_expires_at: new Date(t.expires_at).toISOString(), active: true, connected_at: new Date().toISOString(), error: '' });
+      return page(true, 'X (Twitter) account @' + info.username + ' connect hoyeche (ekhon text post; chobi/video pore). Ei window bondho korun.', st.business);
     }
     if (provider === 'linkedin') {
       // LinkedIn: the member's own profile (OIDC sub is the identity). The token has no refresh

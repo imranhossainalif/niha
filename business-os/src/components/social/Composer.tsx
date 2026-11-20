@@ -5,7 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Icon, NET_NAME, NetLogo, type Net } from './icons';
 import { api, Avatar, Label, Modal, Seg, TYPE_LABEL, upload, useToast, WEEKDAYS, type Account, type MediaRef, type Post, type PostOptions } from './ui';
 
-const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200, pinterest: 800, linkedin: 3000 };
+const LIMIT: Record<Net, number> = { facebook: 63206, instagram: 2200, youtube: 5000, tiktok: 2200, pinterest: 800, linkedin: 3000, twitter: 280 };
 const toLocalInput = (iso?: string | null) => { if (!iso) return ''; const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
 const isVideo = (m: { mime: string }) => m.mime.startsWith('video/');
 export type Draft = Partial<Post> & { idea_label?: string };
@@ -59,6 +59,10 @@ export function Composer({ business, accounts, initial, defaultTime, best, onClo
     if (nets.includes('linkedin') && media.some(isVideo) && media.length > 1) p.push('LinkedIn e ek post e ekta video, ba shudhu chobi (video + chobi mishano jay na).');
     if (nets.includes('linkedin') && media.length > 20) p.push('LinkedIn e 20 tar beshi chobi na.');
     if (nets.includes('pinterest') && !media.some((m) => !isVideo(m))) p.push('Pinterest e chobi lagbe (video pin ekhono na).');
+    if (nets.includes('twitter')) {
+      if (media.length) p.push('X (Twitter) e ekhono chobi/video jay na — text only, media bad din.');
+      if (chosen.some((a) => a.network === 'twitter' && !textFor(a.id).trim())) p.push('X (Twitter) e post korte lekha lagbe.');
+    }
     for (const a of chosen) if (textFor(a.id).length > LIMIT[a.network]) p.push(a.name + ' (' + NET_NAME[a.network] + '): lekha ' + LIMIT[a.network] + ' okkhorer beshi.');
     if (!media.length && !text.trim() && !link) p.push('Kichu likhun ba chobi/video din.');
     return p;

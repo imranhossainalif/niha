@@ -27,6 +27,8 @@ export const CONFIG_FIELDS = [
   { key: 'PINTEREST_APP_SECRET', label: 'Pinterest App secret', group: 'Pinterest', secret: true, help: 'same app → App secret' },
   { key: 'LINKEDIN_CLIENT_ID', label: 'LinkedIn Client ID', group: 'LinkedIn', secret: false, help: 'linkedin.com/developers → your app → Auth → Client ID' },
   { key: 'LINKEDIN_CLIENT_SECRET', label: 'LinkedIn Client secret', group: 'LinkedIn', secret: true, help: 'same app → Auth → Client secret' },
+  { key: 'TWITTER_CLIENT_ID', label: 'X (Twitter) OAuth 2.0 Client ID', group: 'X (Twitter)', secret: false, help: 'developer.x.com → your app → Keys and tokens → OAuth 2.0 Client ID' },
+  { key: 'TWITTER_CLIENT_SECRET', label: 'X (Twitter) OAuth 2.0 Client Secret', group: 'X (Twitter)', secret: true, help: 'same app → OAuth 2.0 Client Secret (User authentication settings e OAuth 2.0 on korte hobe)' },
   { key: 'NUPORT_API_KEY', label: 'Nuport API key', group: 'Nuport', secret: true, help: 'Kids Care orders' },
   { key: 'NUPORT_START_SO', label: 'First run: last SO number already counted', group: 'Nuport', secret: false, help: 'e.g. 12345 (only used once)' },
   { key: 'SHEETS_PUSH_ENABLED', label: 'Accept pushes from the Google Apps Script', group: 'Google Sheets', secret: false, help: 'on/off (default on)' },

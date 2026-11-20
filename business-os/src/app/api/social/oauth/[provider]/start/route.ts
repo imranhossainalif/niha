@@ -4,19 +4,21 @@ import { handle } from '@/lib/http';
 import { needPrincipal } from '@/lib/apiutil';
 import { isFull } from '@/lib/access';
 import { BIZ_IDS } from '@/lib/business';
-import { authUrl, type Provider } from '@/lib/social/oauth';
+import { authUrl, pkceVerifier, type Provider } from '@/lib/social/oauth';
 
 const origin = (req: Request) => { const h = req.headers, host = h.get('x-forwarded-host') || h.get('host'); return host ? (h.get('x-forwarded-proto') || 'https') + '://' + host : new URL(req.url).origin; };
 
 /** Opens Google / TikTok / Facebook / Pinterest / LinkedIn login for connecting a YouTube channel, TikTok account, Facebook Pages + Instagram, a Pinterest account, or a LinkedIn profile (owner/admin). */
 export const GET = handle(async (req: Request, { params }: { params: Promise<{ provider: string }> }) => {
   const provider = (await params).provider as Provider;
-  if (provider !== 'youtube' && provider !== 'tiktok' && provider !== 'meta' && provider !== 'pinterest' && provider !== 'linkedin') throw Object.assign(new Error('Unknown provider'), { status: 404, code: 'not_found' });
+  if (provider !== 'youtube' && provider !== 'tiktok' && provider !== 'meta' && provider !== 'pinterest' && provider !== 'linkedin' && provider !== 'twitter') throw Object.assign(new Error('Unknown provider'), { status: 404, code: 'not_found' });
   const p = await needPrincipal(req, 'write');
   if (!isFull(p)) throw Object.assign(new Error('Account connect shudhu owner/admin korte pare'), { status: 403, code: 'permission_denied' });
   const business = new URL(req.url).searchParams.get('business') || 'kidscare';
   if (!BIZ_IDS.includes(business)) throw Object.assign(new Error('Unknown business'), { status: 404, code: 'not_found' });
   const state = randomBytes(16).toString('hex');
-  (await cookies()).set('bos_oauth', JSON.stringify({ state, business, provider }), { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/api/social/oauth', maxAge: 600 });
-  return Response.redirect(await authUrl(provider, state, origin(req)), 302);
+  // X (Twitter) OAuth 2.0 needs PKCE: keep the verifier in the same short-lived httpOnly cookie as the state.
+  const verifier = provider === 'twitter' ? pkceVerifier() : undefined;
+  (await cookies()).set('bos_oauth', JSON.stringify({ state, business, provider, ...(verifier ? { verifier } : {}) }), { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/api/social/oauth', maxAge: 600 });
+  return Response.redirect(await authUrl(provider, state, origin(req), verifier), 302);
 });
